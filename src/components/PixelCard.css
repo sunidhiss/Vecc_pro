@@ -1,0 +1,15 @@
+.pixel-card {
+    background-color: var(--panel-bg);
+    color: var(--text-main);
+    padding: 1.5rem;
+    position: relative;
+    box-shadow:
+        -4px 0 0 0 var(--pixel-border-color),
+        4px 0 0 0 var(--pixel-border-color),
+        0 -4px 0 0 var(--pixel-border-color),
+        0 4px 0 0 var(--pixel-border-color),
+        8px 8px 15px 0 rgba(0, 0, 0, 0.1);
+    /* Soft floating shadow */
+    margin: 4px;
+    /* to account for shadow */
+}

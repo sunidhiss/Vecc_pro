@@ -1,0 +1,116 @@
+.wordle-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.center-card {
+    text-align: center;
+    padding: 3rem;
+    margin-top: 3rem;
+}
+
+.mb-2 {
+    margin-bottom: 1rem;
+}
+
+.mt-4 {
+    margin-top: 2rem;
+}
+
+.message {
+    color: var(--accent-pink);
+    font-size: 1.2rem;
+    height: 1.5rem;
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 0px rgba(242, 139, 170, 0.3);
+}
+
+.wordle-grid {
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
+    gap: 8px;
+    margin-bottom: 2rem;
+}
+
+.wordle-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+.wordle-cell {
+    width: 60px;
+    height: 60px;
+    border: 4px solid var(--pixel-border-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2rem;
+    font-family: var(--font-heading);
+    background-color: #ffffff;
+    color: var(--text-main);
+    text-transform: uppercase;
+    transition: transform 0.1s;
+}
+
+.wordle-cell.pop {
+    transform: scale(1.1);
+    border-color: var(--text-secondary);
+}
+
+.wordle-cell.correct {
+    background-color: var(--accent-teal);
+    border-color: var(--accent-teal);
+    color: #ffffff;
+}
+
+.wordle-cell.present {
+    background-color: var(--accent-yellow);
+    border-color: var(--accent-yellow);
+    color: #ffffff;
+}
+
+.wordle-cell.absent {
+    background-color: var(--bg-city);
+    border-color: var(--bg-city);
+    color: #ffffff;
+}
+
+.wordle-keyboard {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.keyboard-row {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+}
+
+.key-btn {
+    font-family: var(--font-heading);
+    background-color: var(--bg-city);
+    color: white;
+    border: 2px solid var(--text-secondary);
+    margin: 0;
+    padding: 1rem 0.8rem;
+    cursor: crosshair;
+    font-size: 1rem;
+    border-radius: 0;
+    box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.15);
+}
+
+.key-btn.wide {
+    padding: 1rem 1rem;
+    font-size: 0.8rem;
+}
+
+.key-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 0px 0px 0px transparent;
+}

@@ -1,0 +1,106 @@
+.quiz-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.text-large {
+    font-size: 1.5rem;
+}
+
+.rank-text {
+    font-size: 2rem;
+    margin: 1rem 0 2rem 0;
+}
+
+.quiz-header {
+    width: 100%;
+    text-align: center;
+}
+
+.timer-bar-container {
+    width: 100%;
+    height: 20px;
+    background-color: var(--panel-bg);
+    border: 3px solid var(--accent-purple);
+    margin-bottom: 0.5rem;
+    position: relative;
+}
+
+.timer-bar {
+    height: 100%;
+    background-color: var(--accent-teal);
+    transition: width 1s linear;
+}
+
+.timer-bar.danger {
+    background-color: var(--accent-pink);
+    box-shadow: 0 0 10px var(--accent-pink);
+}
+
+.timer-text {
+    font-size: 1.5rem;
+    color: var(--accent-purple);
+    font-family: var(--font-heading);
+}
+
+.question-card {
+    width: 100%;
+    padding: 2.5rem;
+}
+
+.question-number {
+    font-family: var(--font-heading);
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    font-size: 1rem;
+}
+
+.question-text {
+    font-size: 1.8rem;
+    margin-bottom: 3rem;
+    line-height: 1.4;
+}
+
+.options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.option-btn {
+    background-color: var(--panel-bg);
+    color: var(--text-main);
+    border: 4px solid var(--pixel-border-color);
+    font-family: var(--font-body);
+    font-size: 1.5rem;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: crosshair;
+    transition: all 0.1s;
+}
+
+.option-btn:hover {
+    background-color: var(--accent-teal);
+    color: #ffffff;
+    transform: translateY(-3px);
+    box-shadow:
+        -4px 0 0 0 var(--accent-purple),
+        4px 0 0 0 var(--accent-purple),
+        0 -4px 0 0 var(--accent-purple),
+        0 4px 0 0 var(--accent-purple),
+        4px 4px 0 0 rgba(0, 0, 0, 0.15);
+}
+
+.option-btn:active {
+    transform: translateY(0);
+    box-shadow: var(--pixel-shadow);
+}
+
+@media (max-width: 600px) {
+    .options-grid {
+        grid-template-columns: 1fr;
+    }
+}

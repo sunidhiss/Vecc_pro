@@ -1,0 +1,245 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+:root {
+  /* Pastel 90s Indie Palette */
+  --bg-sky: #b8cdd6;
+  --bg-sky-dark: #a1b8c2;
+  --bg-city: #92abb5;
+
+  --text-main: #2e2a5e;
+  /* Navy/purple */
+  --text-secondary: #4a4a6a;
+  /* Medium grey */
+
+  --accent-purple: #7b6fc4;
+  --accent-teal: #3ecfbe;
+  --accent-yellow: #f5c542;
+  --accent-pink: #f28baa;
+
+  --panel-bg: rgba(234, 244, 248, 0.92);
+
+  --font-heading: 'Press Start 2P', cursive;
+  --font-body: 'VT323', monospace;
+
+  /* Pixel shadow used for chunky borders */
+  --pixel-border-color: var(--accent-teal);
+  --pixel-shadow:
+    -4px 0 0 0 var(--pixel-border-color),
+    4px 0 0 0 var(--pixel-border-color),
+    0 -4px 0 0 var(--pixel-border-color),
+    0 4px 0 0 var(--pixel-border-color);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-sky);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  /* Custom cursor using data URI for a simple pixel crosshair */
+  cursor: crosshair;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* --- Animated Sky Background --- */
+
+/* We create the sky effect using fixed pseudo-elements to not interfere with content flow */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200vw;
+  height: 100vh;
+  z-index: -2;
+  /* Cloud pattern using multiple radial gradients for a simple pixel-puff look */
+  background-image:
+    radial-gradient(circle at 50px 50px, #fff 20px, transparent 21px),
+    radial-gradient(circle at 70px 60px, #fff 25px, transparent 26px),
+    radial-gradient(circle at 100px 50px, #fff 20px, transparent 21px),
+
+    radial-gradient(circle at 300px 150px, #fff 20px, transparent 21px),
+    radial-gradient(circle at 320px 140px, #fff 25px, transparent 26px),
+    radial-gradient(circle at 350px 160px, #fff 20px, transparent 21px),
+
+    radial-gradient(circle at 600px 80px, #fff 20px, transparent 21px),
+    radial-gradient(circle at 620px 70px, #fff 25px, transparent 26px),
+    radial-gradient(circle at 650px 90px, #fff 20px, transparent 21px),
+
+    radial-gradient(circle at 900px 200px, #fff 20px, transparent 21px),
+    radial-gradient(circle at 920px 210px, #fff 25px, transparent 26px),
+    radial-gradient(circle at 950px 190px, #fff 20px, transparent 21px);
+
+  background-size: 1000px 100vh;
+  animation: driftClouds 60s linear infinite;
+  opacity: 0.8;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  height: 15vh;
+  z-index: -1;
+  /* Simple pixel city silhouette */
+  background: var(--bg-city);
+  mask-image: linear-gradient(to top, black 20px, transparent 20px),
+    repeating-linear-gradient(to right, black 0 20px, transparent 20px 30px);
+  -webkit-mask-image: linear-gradient(to top, black 20px, transparent 20px),
+    repeating-linear-gradient(to right, black 0 20px, transparent 20px 30px);
+  opacity: 0.5;
+}
+
+@keyframes driftClouds {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-1000px);
+  }
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  color: var(--accent-purple);
+  text-transform: uppercase;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Base Utility Classes */
+.pixel-border {
+  border: 4px solid transparent;
+  box-shadow: var(--pixel-shadow);
+  background-color: var(--panel-bg);
+  padding: 1rem;
+}
+
+.glow-text {
+  /* Soft glow for light aesthetic instead of harsh neon */
+  text-shadow: 2px 2px 0px rgba(123, 111, 196, 0.3);
+}
+
+.glow-text-pink {
+  text-shadow: 2px 2px 0px rgba(242, 139, 170, 0.3);
+  color: var(--accent-pink);
+}
+
+/* Animations */
+@keyframes flicker {
+  0% {
+    opacity: 1;
+  }
+
+  5% {
+    opacity: 0.8;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  15% {
+    opacity: 0.9;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  55% {
+    opacity: 0.5;
+  }
+
+  60% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.flicker {
+  animation: flicker 4s infinite alternate;
+}
+
+@keyframes bounce {
+  0% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.bounce {
+  animation: bounce 2s infinite ease-in-out;
+}
+
+@keyframes shake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-5px);
+  }
+
+  50% {
+    transform: translateX(5px);
+  }
+
+  75% {
+    transform: translateX(-5px);
+  }
+}
+
+.shake {
+  animation: shake 0.3s ease-in-out;
+}
+
+/* Custom fade-up on page load */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeSlideUp 0.6s ease-out forwards;
+}

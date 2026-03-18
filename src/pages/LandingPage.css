@@ -1,0 +1,158 @@
+.landing-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    width: 100%;
+    min-height: 80vh;
+}
+
+.marquee {
+    width: 100vw;
+    overflow: hidden;
+    background-color: var(--accent-teal);
+    color: var(--text-main);
+    padding: 0.5rem 0;
+    position: absolute;
+    top: -2rem;
+    /* Pull up to sit flush with navbar bottom if needed, or adjust based on layout */
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    border-bottom: 4px solid var(--text-main);
+    border-top: 4px solid var(--text-main);
+    z-index: 10;
+}
+
+.marquee-content {
+    display: inline-block;
+    animation: marquee-scroll 15s linear infinite;
+    font-size: 1.2rem;
+    font-family: var(--font-heading);
+}
+
+@keyframes marquee-scroll {
+    0% {
+        transform: translateX(100vw);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+.hero {
+    margin-top: 6rem;
+    position: relative;
+    z-index: 5;
+}
+
+.title {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: var(--accent-purple);
+}
+
+.subtitle {
+    font-size: 1.5rem;
+    margin-bottom: 3rem;
+    color: var(--text-secondary);
+}
+
+.cta-btn {
+    font-size: 1.5rem;
+    padding: 1.5rem 3rem;
+}
+
+/* Decorative Sprites */
+.sprite {
+    position: absolute;
+    font-size: 3rem;
+    z-index: 1;
+    user-select: none;
+    pointer-events: none;
+    filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.2));
+}
+
+@keyframes spin {
+    0% {
+        transform: scaleX(1);
+    }
+
+    50% {
+        transform: scaleX(-1);
+    }
+
+    100% {
+        transform: scaleX(1);
+    }
+}
+
+.spin {
+    animation: spin 1.5s linear infinite;
+}
+
+.section-title {
+    color: var(--accent-purple);
+    margin-bottom: 2rem;
+    text-shadow: 2px 2px 0px rgba(123, 111, 196, 0.2);
+}
+
+.how-it-works,
+.today-games {
+    margin-top: 5rem;
+    width: 100%;
+    max-width: 1000px;
+    z-index: 5;
+    position: relative;
+}
+
+.steps-container,
+.games-preview {
+    display: flex;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.step-card,
+.preview-card {
+    flex: 1;
+    min-width: 250px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+}
+
+.step-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.2));
+}
+
+.step-card h3 {
+    margin-bottom: 1rem;
+    color: var(--accent-teal);
+}
+
+.step-card p {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+}
+
+.preview-card.locked {
+    opacity: 0.8;
+}
+
+.preview-card.locked h3 {
+    color: var(--text-secondary);
+}
+
+.lock-icon {
+    font-size: 3rem;
+    margin-top: 1rem;
+    display: inline-block;
+    filter: grayscale(100%);
+}
