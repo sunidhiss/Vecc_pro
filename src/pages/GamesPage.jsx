@@ -25,26 +25,26 @@ const GamesOverview = ({ user, points }) => {
 
             {user.isAdmin && (
                 <div className="admin-access">
-                    <Link to="/games/admin" className="pixel-btn admin-btn">ACCESS ADMIN PANEL</Link>
+                    <Link to="/games/admin" className="pixel-btn admin-btn cursor-target">ACCESS ADMIN PANEL</Link>
                 </div>
             )}
 
             <div className="games-grid">
-                <Link to="/games/wordle" className="game-card-link">
+                <Link to="/games/wordle" className="game-card-link cursor-target">
                     <PixelCard className="game-card">
                         <div className="game-icon bounce">📝</div>
                         <h3>PIXEL WORDLE</h3>
                         <p>5 letters. 6 tries. +50 PTS</p>
                     </PixelCard>
                 </Link>
-                <Link to="/games/aptitude" className="game-card-link">
+                <Link to="/games/aptitude" className="game-card-link cursor-target">
                     <PixelCard className="game-card">
                         <div className="game-icon shake">⏱️</div>
                         <h3>APTITUDE BLITZ</h3>
                         <p>60 seconds. 5 Qs. +50 PTS</p>
                     </PixelCard>
                 </Link>
-                <Link to="/games/tech" className="game-card-link">
+                <Link to="/games/tech" className="game-card-link cursor-target">
                     <PixelCard className="game-card">
                         <div className="game-icon">💻</div>
                         <h3>TECH QUEST</h3>

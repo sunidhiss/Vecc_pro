@@ -74,7 +74,7 @@ const TechGame = ({ user, setTodayPoints }) => {
                 <PixelCard className="center-card">
                     <h2 className="glow-text">TECH QUEST</h2>
                     <p className="message mt-4">You already played Tech Quest today!</p>
-                    <PixelButton className="mt-4" onClick={() => window.history.back()}>BACK</PixelButton>
+                    <PixelButton className="mt-4 cursor-target" onClick={() => window.history.back()}>BACK</PixelButton>
                 </PixelCard>
             </div>
         );
@@ -87,7 +87,7 @@ const TechGame = ({ user, setTodayPoints }) => {
                     <h2 className="glow-text">TECH QUEST</h2>
                     <p className="mt-4">5 Tech Questions. No Timer.</p>
                     <p className="mb-4">+10 PTS per correct answer.</p>
-                    <PixelButton className="start-btn bounce" onClick={startGame}>BEGIN QUEST</PixelButton>
+                    <PixelButton className="start-btn bounce cursor-target" onClick={startGame}>BEGIN QUEST</PixelButton>
                 </PixelCard>
             </div>
         );
@@ -107,7 +107,7 @@ const TechGame = ({ user, setTodayPoints }) => {
                     <div className="level-up-container mb-4">
                         <div className="level-up-bar" style={{ width: `${(score / 50) * 100}%` }}></div>
                     </div>
-                    <PixelButton onClick={() => window.history.back()}>BACK TO GAMES</PixelButton>
+                    <PixelButton className="cursor-target" onClick={() => window.history.back()}>BACK TO GAMES</PixelButton>
                 </PixelCard>
                 <style>{`
                     .level-up-container { width: 100%; height: 20px; background: #222; border: 2px solid white; position: relative; overflow: hidden; }
@@ -133,7 +133,7 @@ const TechGame = ({ user, setTodayPoints }) => {
                     {currentQ.options.map((opt, i) => (
                         <button
                             key={i}
-                            className="option-btn pixel-border"
+                            className="option-btn pixel-border cursor-target"
                             onClick={() => handleAnswer(opt)}
                         >
                             {opt}

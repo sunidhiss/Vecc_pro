@@ -123,7 +123,7 @@ const WordleGame = ({ user, setTodayPoints }) => {
                 <PixelCard className="center-card">
                     <h2 className="glow-text">PIXEL WORDLE</h2>
                     <p className="message mt-4">{message}</p>
-                    <PixelButton className="mt-4" onClick={() => window.history.back()}>
+                    <PixelButton className="mt-4 cursor-target" onClick={() => window.history.back()}>
                         BACK TO GAMES
                     </PixelButton>
                 </PixelCard>
@@ -165,7 +165,7 @@ const WordleGame = ({ user, setTodayPoints }) => {
                         {row.map(key => (
                             <button
                                 key={key}
-                                className={`key-btn ${key === 'ENTER' || key === '⌫' ? 'wide' : ''}`}
+                                className={`key-btn cursor-target ${key === 'ENTER' || key === '⌫' ? 'wide' : ''}`}
                                 onClick={() => handleKeyClick(key)}
                             >
                                 {key}

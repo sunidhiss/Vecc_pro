@@ -24,7 +24,7 @@ const LandingPage = () => {
             <header className="hero">
                 <h1 className="glow-text title">PIXEL QUEST</h1>
                 <p className="subtitle">Play. Earn. Dominate your Department.</p>
-                <PixelButton className="cta-btn" onClick={() => navigate('/signin')}>
+                <PixelButton className="cta-btn cursor-target" onClick={() => navigate('/signin')}>
                     START YOUR QUEST →
                 </PixelButton>
             </header>
@@ -32,17 +32,17 @@ const LandingPage = () => {
             <section className="how-it-works">
                 <h2 className="section-title">HOW IT WORKS</h2>
                 <div className="steps-container">
-                    <PixelCard className="step-card">
+                    <PixelCard className="step-card cursor-target">
                         <div className="step-icon">🔑</div>
                         <h3>Login</h3>
                         <p>Authenticate with your USN to start.</p>
                     </PixelCard>
-                    <PixelCard className="step-card">
+                    <PixelCard className="step-card cursor-target">
                         <div className="step-icon bounce">🎮</div>
                         <h3>Play</h3>
                         <p>Complete daily challenges to earn points.</p>
                     </PixelCard>
-                    <PixelCard className="step-card">
+                    <PixelCard className="step-card cursor-target">
                         <div className="step-icon">🏆</div>
                         <h3>Climb</h3>
                         <p>Rise up the individual and department leaderboards.</p>

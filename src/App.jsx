@@ -4,10 +4,12 @@ import SignInPage from './pages/SignInPage';
 import GamesPage from './pages/GamesPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import Navbar from './components/Navbar';
+import TargetCursor from './components/TargetCursor';
 
 function App() {
   return (
     <Router>
+      <TargetCursor />
       <Navbar />
       <div className="main-content">
         <Routes>

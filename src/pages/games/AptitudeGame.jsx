@@ -87,7 +87,7 @@ const AptitudeGame = ({ user, setTodayPoints }) => {
                 <PixelCard className="center-card">
                     <h2 className="glow-text">APTITUDE BLITZ</h2>
                     <p className="message mt-4">You already played Aptitude Blitz today!</p>
-                    <PixelButton className="mt-4" onClick={() => window.history.back()}>BACK</PixelButton>
+                    <PixelButton className="mt-4 cursor-target" onClick={() => window.history.back()}>BACK</PixelButton>
                 </PixelCard>
             </div>
         );
@@ -100,7 +100,7 @@ const AptitudeGame = ({ user, setTodayPoints }) => {
                     <h2 className="glow-text">APTITUDE BLITZ</h2>
                     <p className="mt-4">5 Questions. 60 Seconds.</p>
                     <p className="mb-4">+10 PTS per correct answer.</p>
-                    <PixelButton className="start-btn bounce" onClick={startGame}>START TIMER</PixelButton>
+                    <PixelButton className="start-btn bounce cursor-target" onClick={startGame}>START TIMER</PixelButton>
                 </PixelCard>
             </div>
         );
@@ -117,7 +117,7 @@ const AptitudeGame = ({ user, setTodayPoints }) => {
                     <h2 className="glow-text">TEST COMPLETE</h2>
                     <p className="mt-4 text-large">Score: {score} / 50</p>
                     <p className="mb-4 rank-text glow-text-pink">RANK: {rank}</p>
-                    <PixelButton onClick={() => window.history.back()}>BACK</PixelButton>
+                    <PixelButton className="cursor-target" onClick={() => window.history.back()}>BACK</PixelButton>
                 </PixelCard>
             </div>
         );
@@ -146,7 +146,7 @@ const AptitudeGame = ({ user, setTodayPoints }) => {
                     {currentQ.options.map((opt, i) => (
                         <button
                             key={i}
-                            className="option-btn pixel-border"
+                            className="option-btn pixel-border cursor-target"
                             onClick={() => handleAnswer(opt)}
                         >
                             {opt}
