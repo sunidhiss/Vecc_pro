@@ -3,6 +3,7 @@ import LandingPage from './pages/LandingPage';
 import SignInPage from './pages/SignInPage';
 import GamesPage from './pages/GamesPage';
 import LeaderboardPage from './pages/LeaderboardPage';
+import Team from './Team';
 import Navbar from './components/Navbar';
 import TargetCursor from './components/TargetCursor';
 
@@ -17,6 +18,7 @@ function App() {
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/games/*" element={<GamesPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/team" element={<Team />} />
         </Routes>
       </div>
     </Router>

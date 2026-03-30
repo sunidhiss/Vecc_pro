@@ -25,6 +25,7 @@ const Navbar = () => {
                 <Link to="/" className={location.pathname === '/' ? 'active' : ''}>HOME</Link>
                 <Link to="/games" className={location.pathname === '/games' ? 'active' : ''}>GAMES</Link>
                 <Link to="/leaderboard" className={location.pathname === '/leaderboard' ? 'active' : ''}>LEADERBOARD</Link>
+                <Link to="/team" className={location.pathname === '/team' ? 'active' : ''}>TEAM</Link>
                 {currentUser ? (
                     <button onClick={handleSignOut} className="signout-btn">SIGN OUT</button>
                 ) : (
