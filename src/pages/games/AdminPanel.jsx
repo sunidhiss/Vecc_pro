@@ -113,7 +113,7 @@ const AdminPanel = () => {
                     />
                 </div>
             ))}
-            <PixelButton type="submit">SAVE {type.toUpperCase()} QUIZ</PixelButton>
+            <PixelButton type="submit" className="cursor-target">SAVE {type.toUpperCase()} QUIZ</PixelButton>
         </form>
     );
 
@@ -159,7 +159,7 @@ const AdminPanel = () => {
                     />
                 </div>
             ))}
-            <PixelButton type="submit">SAVE OUTPUT QUIZ</PixelButton>
+            <PixelButton type="submit" className="cursor-target">SAVE OUTPUT QUIZ</PixelButton>
         </form>
     );
 
@@ -168,34 +168,34 @@ const AdminPanel = () => {
             <PixelCard className="admin-card">
                 <div className="admin-header">
                     <h2 className="glow-text">SYSTEM ADMIN</h2>
-                    <PixelButton onClick={() => navigate('/games')} className="btn-small">BACK TO GAMES</PixelButton>
+                    <PixelButton onClick={() => navigate('/games')} className="btn-small cursor-target">BACK TO GAMES</PixelButton>
                 </div>
 
                 <p className="admin-date">Configuring games for Date: <strong>{today}</strong></p>
 
                 <div className="admin-tabs" style={{ flexWrap: 'wrap' }}>
                     <button
-                        className={`tab-btn ${activeTab === 'wordle' ? 'active' : ''}`}
+                        className={`tab-btn cursor-target ${activeTab === 'wordle' ? 'active' : ''}`}
                         onClick={() => setActiveTab('wordle')}
                     >WORDLE</button>
                     <button
-                        className={`tab-btn ${activeTab === 'aptitude' ? 'active' : ''}`}
+                        className={`tab-btn cursor-target ${activeTab === 'aptitude' ? 'active' : ''}`}
                         onClick={() => setActiveTab('aptitude')}
                     >APTITUDE</button>
                     <button
-                        className={`tab-btn ${activeTab === 'techquiz' ? 'active' : ''}`}
+                        className={`tab-btn cursor-target ${activeTab === 'techquiz' ? 'active' : ''}`}
                         onClick={() => setActiveTab('techquiz')}
                     >TECH QUEST</button>
                     <button
-                        className={`tab-btn ${activeTab === 'unscramble' ? 'active' : ''}`}
+                        className={`tab-btn cursor-target ${activeTab === 'unscramble' ? 'active' : ''}`}
                         onClick={() => setActiveTab('unscramble')}
                     >UNSCRAMBLE</button>
                     <button
-                        className={`tab-btn ${activeTab === 'fluency' ? 'active' : ''}`}
+                        className={`tab-btn cursor-target ${activeTab === 'fluency' ? 'active' : ''}`}
                         onClick={() => setActiveTab('fluency')}
                     >FLUENCY</button>
                     <button
-                        className={`tab-btn ${activeTab === 'output' ? 'active' : ''}`}
+                        className={`tab-btn cursor-target ${activeTab === 'output' ? 'active' : ''}`}
                         onClick={() => setActiveTab('output')}
                     >OUTPUT</button>
                 </div>
@@ -211,7 +211,7 @@ const AdminPanel = () => {
                                 onChange={(e) => setWordleWord(e.target.value.toUpperCase())}
                                 placeholder="e.g. QUEST"
                             />
-                            <PixelButton type="submit">SAVE WORD</PixelButton>
+                            <PixelButton type="submit" className="cursor-target">SAVE WORD</PixelButton>
                         </form>
                     )}
 
@@ -224,7 +224,7 @@ const AdminPanel = () => {
                                 onChange={(e) => setUnscrambleWord(e.target.value.toUpperCase())}
                                 placeholder="e.g. REACT"
                             />
-                            <PixelButton type="submit">SAVE WORD</PixelButton>
+                            <PixelButton type="submit" className="cursor-target">SAVE WORD</PixelButton>
                         </form>
                     )}
 

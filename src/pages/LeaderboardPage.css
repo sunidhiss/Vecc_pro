@@ -71,6 +71,10 @@
     background-color: #ffffff;
 }
 
+.dark .lb-row:hover {
+    background-color: var(--bg-city);
+}
+
 .lb-row.is-me {
     background-color: rgba(62, 207, 190, 0.1);
     border: 2px solid var(--accent-teal);
@@ -99,7 +103,7 @@
     padding: 0.2rem 0.5rem;
     font-size: 0.8rem;
     color: #ffffff;
-    box-shadow: 2px 2px 0 var(--text-main);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
 }
 
 /* Animations */
@@ -249,7 +253,7 @@
 }
 
 .players-count {
-    color: #777;
+    color: var(--text-secondary);
     margin-top: 0.3rem;
 }
 
