@@ -91,6 +91,11 @@
     font-size: 1.5rem;
     padding: 0.8rem;
     outline: none;
+    cursor: text !important;
+}
+
+.dark .pixel-input {
+    background-color: var(--panel-bg);
 }
 
 .pixel-input:focus {

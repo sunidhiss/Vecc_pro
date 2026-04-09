@@ -98,7 +98,7 @@ const SignInPage = () => {
                         </div>
                     )}
 
-                    <PixelButton type="submit" className="login-btn">
+                    <PixelButton type="submit" className="login-btn cursor-target">
                         PRESS START
                     </PixelButton>
                 </form>

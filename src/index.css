@@ -41,6 +41,11 @@ body.dark {
   --accent-purple: #9b8ceb;
 }
 
+.dark .pixel-input {
+  background-color: var(--bg-city) !important;
+  color: var(--text-main) !important;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

@@ -24,7 +24,10 @@ const LandingPage = () => {
             <header className="hero">
                 <h1 className="glow-text title">PIXEL QUEST</h1>
                 <p className="subtitle">Play. Earn. Dominate your Department.</p>
-                <PixelButton className="cta-btn cursor-target" onClick={() => navigate('/loading')}>
+                <PixelButton className="cta-btn cursor-target" onClick={() => {
+                    const currentUser = JSON.parse(localStorage.getItem('pixelQuestUser'));
+                    navigate(currentUser ? '/games' : '/signin');
+                }}>
                     START YOUR QUEST →
                 </PixelButton>
             </header>

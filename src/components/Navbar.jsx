@@ -45,7 +45,7 @@ const Navbar = () => {
                     </>
                 ) : (
                     <>
-                        <Link to="/loading">SIGN IN</Link>
+                        <Link to="/signin">SIGN IN</Link>
                         <button onClick={toggleTheme} className="theme-btn">🌙</button>
                     </>
                 )}
