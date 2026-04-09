@@ -30,6 +30,17 @@
     0 4px 0 0 var(--pixel-border-color);
 }
 
+body.dark {
+  --bg-sky: #0a0f1a;
+  --bg-city: #0c1524;
+  --text-main: #ffffff;
+  --text-secondary: #94a3b8;
+  --panel-bg: rgba(15, 34, 54, 0.95);
+  --pixel-border-color: #22d3ee;
+  --accent-teal: #22d3ee;
+  --accent-purple: #9b8ceb;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

@@ -35,3 +35,8 @@
     text-shadow: none;
     border-bottom: 2px dashed var(--accent-teal);
 }
+
+.theme-btn {
+    margin-left: 10px;
+    cursor: crosshair !important;
+}

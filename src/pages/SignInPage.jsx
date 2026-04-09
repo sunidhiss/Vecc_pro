@@ -64,9 +64,8 @@ const SignInPage = () => {
 
     return (
         <div className="signin-page fade-in-up">
-            <div className="sprite gold-coin spin coin-drop" style={{ marginBottom: '-2rem', zIndex: 10 }}>🪙</div>
             <PixelCard className={`login-terminal ${isShake ? 'shake' : ''}`}>
-                <h2 className="glow-text flicker">INSERT COIN TO CONTINUE</h2>
+                <h2 className="glow-text flicker">INSERT USN TO CONTINUE</h2>
                 <div className="blinking-cursor">_</div>
 
                 <form onSubmit={handleLogin} className="login-form">

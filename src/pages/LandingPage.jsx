@@ -24,7 +24,7 @@ const LandingPage = () => {
             <header className="hero">
                 <h1 className="glow-text title">PIXEL QUEST</h1>
                 <p className="subtitle">Play. Earn. Dominate your Department.</p>
-                <PixelButton className="cta-btn cursor-target" onClick={() => navigate('/signin')}>
+                <PixelButton className="cta-btn cursor-target" onClick={() => navigate('/loading')}>
                     START YOUR QUEST →
                 </PixelButton>
             </header>
@@ -35,7 +35,7 @@ const LandingPage = () => {
                     <PixelCard className="step-card cursor-target">
                         <div className="step-icon">🔑</div>
                         <h3>Login</h3>
-                        <p>Authenticate with your USN to start.</p>
+                        <p>Enter with your USN to start.</p>
                     </PixelCard>
                     <PixelCard className="step-card cursor-target">
                         <div className="step-icon bounce">🎮</div>
