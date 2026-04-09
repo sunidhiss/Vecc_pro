@@ -1,0 +1,42 @@
+.unscramble-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.scrambled-block {
+    background-color: var(--panel-bg);
+    color: var(--accent-purple);
+    font-size: 3rem;
+    padding: 2rem;
+    font-family: var(--font-heading);
+    letter-spacing: 0.5rem;
+    border: 4px solid var(--accent-teal);
+    text-align: center;
+    box-shadow:
+        inset 0 0 20px rgba(62, 207, 190, 0.2),
+        0 8px 25px rgba(0, 0, 0, 0.1);
+    word-break: break-all;
+}
+
+.input-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.guess-input {
+    width: 100%;
+    max-width: 300px;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.msg-bounce {
+    animation: bounce 1s infinite alternate;
+    font-size: 1.2rem;
+    color: var(--text-main);
+}

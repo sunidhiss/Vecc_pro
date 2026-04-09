@@ -8,6 +8,9 @@ import WordleGame from './games/WordleGame';
 import AptitudeGame from './games/AptitudeGame';
 import TechGame from './games/TechGame';
 import AdminPanel from './games/AdminPanel';
+import UnscrambleGame from './games/UnscrambleGame';
+import EnglishFluencyGame from './games/EnglishFluencyGame';
+import GuessOutputGame from './games/GuessOutputGame';
 
 const GamesOverview = ({ user, points }) => {
     return (
@@ -39,16 +42,37 @@ const GamesOverview = ({ user, points }) => {
                 </Link>
                 <Link to="/games/aptitude" className="game-card-link cursor-target">
                     <PixelCard className="game-card">
-                        <div className="game-icon shake">⏱️</div>
+                        <div className="game-icon bounce">⏱️</div>
                         <h3>APTITUDE BLITZ</h3>
                         <p>60 seconds. 5 Qs. +50 PTS</p>
                     </PixelCard>
                 </Link>
                 <Link to="/games/tech" className="game-card-link cursor-target">
                     <PixelCard className="game-card">
-                        <div className="game-icon">💻</div>
+                        <div className="game-icon bounce">💻</div>
                         <h3>TECH QUEST</h3>
                         <p>5 Tech Qs. No Timer. +50 PTS</p>
+                    </PixelCard>
+                </Link>
+                <Link to="/games/unscramble" className="game-card-link cursor-target">
+                    <PixelCard className="game-card">
+                        <div className="game-icon bounce">🔀</div>
+                        <h3>UNSCRAMBLE</h3>
+                        <p>Guess the word. +50 PTS</p>
+                    </PixelCard>
+                </Link>
+                <Link to="/games/fluency" className="game-card-link cursor-target">
+                    <PixelCard className="game-card">
+                        <div className="game-icon bounce">📖</div>
+                        <h3>ENGLISH FLUENCY</h3>
+                        <p>5 Grammar Qs. +50 PTS</p>
+                    </PixelCard>
+                </Link>
+                <Link to="/games/output" className="game-card-link cursor-target">
+                    <PixelCard className="game-card">
+                        <div className="game-icon bounce">⚙️</div>
+                        <h3>GUESS OUTPUT</h3>
+                        <p>Evaluate code. +50 PTS</p>
                     </PixelCard>
                 </Link>
             </div>
@@ -88,6 +112,9 @@ const GamesPage = () => {
                 <Route path="/wordle" element={<WordleGame user={user} setTodayPoints={setTodayPoints} />} />
                 <Route path="/aptitude" element={<AptitudeGame user={user} setTodayPoints={setTodayPoints} />} />
                 <Route path="/tech" element={<TechGame user={user} setTodayPoints={setTodayPoints} />} />
+                <Route path="/unscramble" element={<UnscrambleGame user={user} setTodayPoints={setTodayPoints} />} />
+                <Route path="/fluency" element={<EnglishFluencyGame user={user} setTodayPoints={setTodayPoints} />} />
+                <Route path="/output" element={<GuessOutputGame user={user} setTodayPoints={setTodayPoints} />} />
                 {user.isAdmin && <Route path="/admin" element={<AdminPanel />} />}
             </Routes>
         </div>

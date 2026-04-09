@@ -15,16 +15,34 @@ const AdminPanel = () => {
 
     // Quiz State Helper
     const initQuestions = () => Array(5).fill({ q: '', options: ['', '', '', ''], answer: '' });
+    const initOutputQuestions = () => Array(5).fill({ q: '', code: '', options: ['', '', '', ''], answer: '' });
 
-    // Aptitude State
+    // Old Games State
     const [aptitudeQs, setAptitudeQs] = useState(initQuestions());
-
-    // Tech State
     const [techQs, setTechQs] = useState(initQuestions());
+
+    // New Games State
+    const [unscrambleWord, setUnscrambleWord] = useState('');
+    const [fluencyQs, setFluencyQs] = useState(initQuestions());
+    const [outputQs, setOutputQs] = useState(initOutputQuestions());
 
     const triggerSuccess = () => {
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 2000);
+    };
+
+    const handleSaveWord = (e, keyPrefix, word, setWord) => {
+        e.preventDefault();
+        if (word.length >= 2) { // Unscramble can be any length >= 2, Wordle must be 5. But let's just use this generic or a specific one.
+            localStorage.setItem(`${keyPrefix}_${today}`, word.toUpperCase());
+            // Since unscramble uses a generic key:
+            if (keyPrefix === 'pq_unscramble_word') {
+                localStorage.setItem('pq_unscramble_word', word.toUpperCase());
+            }
+            triggerSuccess();
+        } else {
+            alert("Word must be at least 2 letters");
+        }
     };
 
     const handleSaveWordle = (e) => {
@@ -99,6 +117,52 @@ const AdminPanel = () => {
         </form>
     );
 
+    const renderOutputQuizForm = (qs, setQs, type) => (
+        <form onSubmit={(e) => handleSaveQuiz(e, type, qs)} className="admin-form">
+            {qs.map((q, i) => (
+                <div key={i} className="admin-q-block pixel-border">
+                    <label>Q{i + 1}:</label>
+                    <input
+                        className="pixel-input full-width"
+                        value={q.q}
+                        onChange={(e) => updateQuestion(qs, setQs, i, 'q', e.target.value)}
+                        placeholder="Enter question"
+                    />
+
+                    <label>Code Snippet (Optional):</label>
+                    <textarea
+                        className="pixel-input full-width"
+                        value={q.code || ''}
+                        onChange={(e) => updateQuestion(qs, setQs, i, 'code', e.target.value)}
+                        placeholder="Enter code snippet here"
+                        rows={3}
+                    />
+
+                    <div className="options-admin-grid">
+                        {q.options.map((opt, j) => (
+                            <div key={j}>
+                                <label>Opt {j + 1}:</label>
+                                <input
+                                    className="pixel-input"
+                                    value={opt}
+                                    onChange={(e) => updateOption(qs, setQs, i, j, e.target.value)}
+                                />
+                            </div>
+                        ))}
+                    </div>
+
+                    <label>Correct Answer (must match an option):</label>
+                    <input
+                        className="pixel-input full-width correct-input"
+                        value={q.answer}
+                        onChange={(e) => updateQuestion(qs, setQs, i, 'answer', e.target.value)}
+                    />
+                </div>
+            ))}
+            <PixelButton type="submit">SAVE OUTPUT QUIZ</PixelButton>
+        </form>
+    );
+
     return (
         <div className="admin-container">
             <PixelCard className="admin-card">
@@ -109,7 +173,7 @@ const AdminPanel = () => {
 
                 <p className="admin-date">Configuring games for Date: <strong>{today}</strong></p>
 
-                <div className="admin-tabs">
+                <div className="admin-tabs" style={{ flexWrap: 'wrap' }}>
                     <button
                         className={`tab-btn ${activeTab === 'wordle' ? 'active' : ''}`}
                         onClick={() => setActiveTab('wordle')}
@@ -122,6 +186,18 @@ const AdminPanel = () => {
                         className={`tab-btn ${activeTab === 'techquiz' ? 'active' : ''}`}
                         onClick={() => setActiveTab('techquiz')}
                     >TECH QUEST</button>
+                    <button
+                        className={`tab-btn ${activeTab === 'unscramble' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('unscramble')}
+                    >UNSCRAMBLE</button>
+                    <button
+                        className={`tab-btn ${activeTab === 'fluency' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('fluency')}
+                    >FLUENCY</button>
+                    <button
+                        className={`tab-btn ${activeTab === 'output' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('output')}
+                    >OUTPUT</button>
                 </div>
 
                 <div className="admin-content">
@@ -139,8 +215,23 @@ const AdminPanel = () => {
                         </form>
                     )}
 
+                    {activeTab === 'unscramble' && (
+                        <form onSubmit={(e) => handleSaveWord(e, 'pq_unscramble_word', unscrambleWord, setUnscrambleWord)} className="admin-form">
+                            <label>Today's Unscramble Word:</label>
+                            <input
+                                className="pixel-input wordle-admin-input"
+                                value={unscrambleWord}
+                                onChange={(e) => setUnscrambleWord(e.target.value.toUpperCase())}
+                                placeholder="e.g. REACT"
+                            />
+                            <PixelButton type="submit">SAVE WORD</PixelButton>
+                        </form>
+                    )}
+
                     {activeTab === 'aptitude' && renderQuizForm(aptitudeQs, setAptitudeQs, 'aptitude')}
                     {activeTab === 'techquiz' && renderQuizForm(techQs, setTechQs, 'techquiz')}
+                    {activeTab === 'fluency' && renderQuizForm(fluencyQs, setFluencyQs, 'fluencyquiz')}
+                    {activeTab === 'output' && renderOutputQuizForm(outputQs, setOutputQs, 'outputquiz')}
                 </div>
 
                 {showSuccess && (

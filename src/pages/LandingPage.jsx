@@ -65,6 +65,18 @@ const LandingPage = () => {
                         <h3>TECH QUEST</h3>
                         <span className="lock-icon shake">🔒</span>
                     </PixelCard>
+                    <PixelCard className="preview-card locked">
+                        <h3>UNSCRAMBLE</h3>
+                        <span className="lock-icon shake">🔒</span>
+                    </PixelCard>
+                    <PixelCard className="preview-card locked">
+                        <h3>ENGLISH FLUENCY</h3>
+                        <span className="lock-icon shake">🔒</span>
+                    </PixelCard>
+                    <PixelCard className="preview-card locked">
+                        <h3>GUESS OUTPUT</h3>
+                        <span className="lock-icon shake">🔒</span>
+                    </PixelCard>
                 </div>
             </section>
         </div>
