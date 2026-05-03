@@ -57,7 +57,7 @@ const GamesOverview = ({ user, points }) => {
                 <Link to="/games/unscramble" className="game-card-link cursor-target">
                     <PixelCard className="game-card">
                         <div className="game-icon bounce">🔀</div>
-                        <h3>UNSCRAMBLE</h3>
+                        <h3>WORD SCRAMBLE</h3>
                         <p>Guess the word. +50 PTS</p>
                     </PixelCard>
                 </Link>

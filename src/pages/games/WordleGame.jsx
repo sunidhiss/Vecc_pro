@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PixelCard from '../../components/PixelCard';
 import PixelButton from '../../components/PixelButton';
 import './WordleGame.css';
@@ -7,6 +8,7 @@ const WORD_LENGTH = 5;
 const MAX_GUESSES = 6;
 
 const WordleGame = ({ user, setTodayPoints }) => {
+    const navigate = useNavigate();
     const today = new Date().toISOString().split('T')[0];
     const gameKey = `${user.usn}_${today}_wordle`;
 
@@ -123,7 +125,7 @@ const WordleGame = ({ user, setTodayPoints }) => {
                 <PixelCard className="center-card">
                     <h2 className="glow-text">PIXEL WORDLE</h2>
                     <p className="message mt-4">{message}</p>
-                    <PixelButton className="mt-4 cursor-target" onClick={() => window.history.back()}>
+                    <PixelButton className="mt-4 cursor-target" onClick={() => navigate('/games')}>
                         BACK TO GAMES
                     </PixelButton>
                 </PixelCard>
@@ -134,7 +136,18 @@ const WordleGame = ({ user, setTodayPoints }) => {
     return (
         <div className="wordle-container">
             <h2 className="glow-text mb-2">PIXEL WORDLE</h2>
-            {message && <div className="message">{message}</div>}
+            {message && gameState === 'playing' && <div className="message">{message}</div>}
+
+            {(gameState === 'won' || gameState === 'lost') && (
+                <div className="wordle-result-inline">
+                    <div className={`result-text ${gameState === 'won' ? 'result-win' : 'result-lose'}`}>
+                        {gameState === 'won' ? '🎉 YOU WON! +50 PTS' : `😔 GAME OVER — Word was ${targetWord}. +5 PTS`}
+                    </div>
+                    <PixelButton className="mt-4 cursor-target" onClick={() => navigate('/games')}>
+                        ← BACK TO GAMES
+                    </PixelButton>
+                </div>
+            )}
 
             <div className="wordle-grid">
                 {guesses.map((guess, i) => {

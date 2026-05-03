@@ -173,7 +173,7 @@ const AdminPanel = () => {
 
                 <p className="admin-date">Configuring games for Date: <strong>{today}</strong></p>
 
-                <div className="admin-tabs" style={{ flexWrap: 'wrap' }}>
+                <div className="admin-tabs">
                     <button
                         className={`tab-btn cursor-target ${activeTab === 'wordle' ? 'active' : ''}`}
                         onClick={() => setActiveTab('wordle')}

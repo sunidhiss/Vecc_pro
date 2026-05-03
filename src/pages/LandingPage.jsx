@@ -19,7 +19,7 @@ const LandingPage = () => {
             <div className="sprite pink-bunny bounce" style={{ top: '15%', left: '15%' }}>🐰</div>
             <div className="sprite teal-croc bounce" style={{ top: '60%', right: '10%', animationDelay: '0.5s' }}>🐊</div>
             <div className="sprite gold-coin spin" style={{ top: '30%', right: '25%' }}>🪙</div>
-            <div className="sprite gold-coin spin" style={{ top: '70%', left: '20%', animationDelay: '0.3s' }}>🪙</div>
+            <div className="sprite gold-coin spin" style={{ top: '70%', left: '20%', animationDelay: '0.7s' }}>🪙</div>
 
             <header className="hero">
                 <h1 className="glow-text title">PIXEL QUEST</h1>
@@ -69,7 +69,7 @@ const LandingPage = () => {
                         <span className="lock-icon shake">🔒</span>
                     </PixelCard>
                     <PixelCard className="preview-card locked">
-                        <h3>UNSCRAMBLE</h3>
+                        <h3>WORD SCRAMBLE</h3>
                         <span className="lock-icon shake">🔒</span>
                     </PixelCard>
                     <PixelCard className="preview-card locked">
