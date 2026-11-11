@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import PixelCard from '../components/PixelCard';
 import api from '../services/api';
+import queryQuestApi from '../services/queryQuestApi';
 import './LeaderboardPage.css';
 
 const LeaderboardPage = () => {
     const [activeTab, setActiveTab] = useState('students');
     const [students, setStudents] = useState([]);
     const [departments, setDepartments] = useState([]);
+    const [queryQuestLeaders, setQueryQuestLeaders] = useState([]);
     const [currentUser] = useState(() => {
         const cUserStr = localStorage.getItem('pixelQuestUser');
         if (!cUserStr) return null;
@@ -21,10 +23,12 @@ const LeaderboardPage = () => {
         Promise.all([
             api.getStudentLeaderboard(),
             api.getDepartmentLeaderboard(),
+            queryQuestApi.getLeaderboard().catch(() => []),
         ])
-            .then(([studentData, deptData]) => {
+            .then(([studentData, deptData, qqData]) => {
                 setStudents(studentData);
                 setDepartments(deptData);
+                setQueryQuestLeaders(qqData || []);
             })
             .catch((err) => {
                 console.error('Failed to load leaderboard:', err);
@@ -55,6 +59,12 @@ const LeaderboardPage = () => {
                 >
                     [🏰 DEPARTMENTS]
                 </button>
+                <button
+                    className={`lb-tab cursor-target ${activeTab === 'queryquest' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('queryquest')}
+                >
+                    [🗄️ QUERY QUEST]
+                </button>
             </div>
 
             {activeTab === 'students' && (
@@ -82,6 +92,44 @@ const LeaderboardPage = () => {
                             })}
                         </tbody>
                     </table>
+                </PixelCard>
+            )}
+
+            {activeTab === 'queryquest' && (
+                <PixelCard className="lb-card">
+                    {queryQuestLeaders.length === 0 ? (
+                        <p className="text-center" style={{ padding: '2rem', fontSize: '1.25rem' }}>
+                            No Query Quest missions solved yet. Be the first SQL Master!
+                        </p>
+                    ) : (
+                        <table className="lb-table">
+                            <thead>
+                                <tr>
+                                    <th>RANK</th>
+                                    <th>USN</th>
+                                    <th>MISSIONS</th>
+                                    <th>OPTIMAL</th>
+                                    <th>AVG MS</th>
+                                    <th>QQ PTS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {queryQuestLeaders.map((q, idx) => {
+                                    const isMe = currentUser && currentUser.usn === q.usn;
+                                    return (
+                                        <tr key={q.usn} className={`lb-row slide-in delay-${idx % 10} cursor-target ${isMe ? 'is-me' : ''}`}>
+                                            <td className="rank-cell">{getMedal(idx)}</td>
+                                            <td>{q.usn} {isMe && '(YOU)'}</td>
+                                            <td>{q.missionsCompleted}</td>
+                                            <td>{q.optimalSolves} ★</td>
+                                            <td>{q.avgExecutionMs} ms</td>
+                                            <td className="points-cell glow-text-pink">{q.totalPoints}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
                 </PixelCard>
             )}
 

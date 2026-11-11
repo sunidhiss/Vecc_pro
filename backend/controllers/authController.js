@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const supabase = require('../config/supabase');
@@ -37,12 +38,42 @@ function parseUSN(usnString) {
     };
 }
 
+function isAdminUser(user) {
+    return user?.role === 'admin' || Boolean(user?.is_admin);
+}
+
 function signToken(user) {
+    const isAdmin = isAdminUser(user);
     return jwt.sign(
-        { id: user.id, usn: user.usn, isAdmin: Boolean(user.is_admin) },
+        {
+            usn: user.usn,
+            role: user.role || (isAdmin ? 'admin' : 'student'),
+            isAdmin,
+        },
         JWT_SECRET,
         { expiresIn: '24h' }
     );
+}
+
+function formatUser(user, fallbackDepartment) {
+    const isAdmin = isAdminUser(user);
+    return {
+        usn: user.usn,
+        department: isAdmin
+            ? 'System Admin'
+            : (DEPT_MAP[user.department_code] || fallbackDepartment || user.department_code),
+        year: user.academic_year ?? user.year ?? null,
+        rollNo: user.roll_no ?? null,
+        role: user.role || (isAdmin ? 'admin' : 'student'),
+        isAdmin,
+    };
+}
+
+function timingSafeMatch(input, expected) {
+    const a = Buffer.from(String(input), 'utf8');
+    const b = Buffer.from(String(expected), 'utf8');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
 }
 
 /**
@@ -59,7 +90,7 @@ exports.login = async (req, res, next) => {
 
         let { data: user, error } = await supabase
             .from('users')
-            .select('id, usn, department_code, year, roll_no, is_admin')
+            .select('*')
             .eq('usn', parsed.usn)
             .maybeSingle();
 
@@ -71,11 +102,11 @@ exports.login = async (req, res, next) => {
                 .insert({
                     usn: parsed.usn,
                     department_code: parsed.departmentCode,
-                    year: parsed.year,
+                    academic_year: parsed.year,
                     roll_no: parsed.rollNo,
-                    is_admin: false,
+                    role: 'student',
                 })
-                .select('id, usn, department_code, year, roll_no, is_admin')
+                .select('*')
                 .single();
 
             if (insertError) throw insertError;
@@ -84,14 +115,7 @@ exports.login = async (req, res, next) => {
 
         const token = signToken(user);
         return res.json({
-            user: {
-                id: user.id,
-                usn: user.usn,
-                department: DEPT_MAP[user.department_code] || parsed.department,
-                year: user.year,
-                rollNo: user.roll_no,
-                isAdmin: Boolean(user.is_admin),
-            },
+            user: formatUser(user, parsed.department),
             token,
         });
     } catch (err) {
@@ -101,7 +125,7 @@ exports.login = async (req, res, next) => {
 
 /**
  * POST /api/auth/admin-login
- * Authenticates admin account using bcrypt password verification.
+ * Authenticates admin account using bcrypt password verification (with env fallback if password_hash column is absent).
  */
 exports.adminLogin = async (req, res, next) => {
     try {
@@ -110,31 +134,43 @@ exports.adminLogin = async (req, res, next) => {
             return res.status(400).json({ error: 'Password is required' });
         }
 
+        const initialPassword = process.env.ADMIN_PASSWORD || 'hey1234';
+
         let { data: admin, error } = await supabase
             .from('users')
-            .select('id, usn, department_code, is_admin, password_hash')
-            .eq('is_admin', true)
+            .select('*')
+            .eq('role', 'admin')
             .limit(1)
             .maybeSingle();
 
         if (error) throw error;
 
         if (!admin) {
-            const initialPassword = process.env.ADMIN_PASSWORD || 'hey1234';
             const passwordHash = await bcrypt.hash(initialPassword, 10);
+            const baseAdminRow = {
+                usn: 'ADMIN',
+                department_code: 'CS',
+                academic_year: '00',
+                roll_no: '000',
+                role: 'admin',
+            };
 
-            const { data: created, error: insertError } = await supabase
+            let { data: created, error: insertError } = await supabase
                 .from('users')
-                .insert({
-                    usn: 'ADMIN',
-                    department_code: 'CS',
-                    year: '00',
-                    roll_no: '000',
-                    is_admin: true,
-                    password_hash: passwordHash,
-                })
-                .select('id, usn, department_code, is_admin, password_hash')
+                .insert({ ...baseAdminRow, password_hash: passwordHash })
+                .select('*')
                 .single();
+
+            // Allow admin login before migration.sql adds password_hash column
+            if (insertError && (insertError.code === 'PGRST204' || insertError.code === '42703' || String(insertError.message || '').includes('password_hash'))) {
+                const retry = await supabase
+                    .from('users')
+                    .insert(baseAdminRow)
+                    .select('*')
+                    .single();
+                created = retry.data;
+                insertError = retry.error;
+            }
 
             if (insertError) throw insertError;
             admin = created;
@@ -142,7 +178,7 @@ exports.adminLogin = async (req, res, next) => {
 
         const valid = admin.password_hash
             ? await bcrypt.compare(password, admin.password_hash)
-            : false;
+            : timingSafeMatch(password, initialPassword);
 
         if (!valid) {
             return res.status(401).json({ error: 'INVALID CREDENTIALS' });
@@ -150,12 +186,7 @@ exports.adminLogin = async (req, res, next) => {
 
         const token = signToken(admin);
         return res.json({
-            user: {
-                id: admin.id,
-                usn: admin.usn,
-                department: 'System Admin',
-                isAdmin: true,
-            },
+            user: formatUser(admin),
             token,
         });
     } catch (err) {
@@ -171,8 +202,8 @@ exports.getMe = async (req, res, next) => {
     try {
         const { data: user, error } = await supabase
             .from('users')
-            .select('id, usn, department_code, year, roll_no, is_admin')
-            .eq('id', req.user.id)
+            .select('*')
+            .eq('usn', req.user.usn)
             .maybeSingle();
 
         if (error) throw error;
@@ -181,14 +212,7 @@ exports.getMe = async (req, res, next) => {
         }
 
         return res.json({
-            user: {
-                id: user.id,
-                usn: user.usn,
-                department: user.is_admin ? 'System Admin' : (DEPT_MAP[user.department_code] || user.department_code),
-                year: user.year,
-                rollNo: user.roll_no,
-                isAdmin: Boolean(user.is_admin),
-            },
+            user: formatUser(user),
         });
     } catch (err) {
         next(err);

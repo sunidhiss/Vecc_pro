@@ -12,7 +12,7 @@ const GuessOutputGame = ({ setTodayPoints }) => {
     const [gameState, setGameState] = useState('loading');
 
     useEffect(() => {
-        api.getQuiz('outputquiz')
+        api.getQuiz('output')
             .then((data) => {
                 if (data.alreadyPlayed) {
                     setGameState('already_played');
@@ -36,7 +36,7 @@ const GuessOutputGame = ({ setTodayPoints }) => {
             setCurrentIndex(currentIndex + 1);
         } else {
             try {
-                const data = await api.submitQuiz('outputquiz', newAnswers);
+                const data = await api.submitQuiz('output', newAnswers);
                 setScore(data.score);
                 setGameState('completed');
                 setTodayPoints(prev => (typeof prev === 'number' ? prev : 0) + (data.score || 0));

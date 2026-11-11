@@ -1,37 +1,54 @@
 const supabase = require('../config/supabase');
-
-const VALID_GAMES = ['wordle', 'unscramble', 'aptitude', 'techquiz', 'fluencyquiz', 'outputquiz'];
+const {
+    DAILY_QUESTION_KEYS,
+    normalizeGameKey,
+    getDefaultContentForKey,
+    unwrapWordContent,
+    unwrapQuizQuestions,
+} = require('../utils/gameKeys');
 
 function getTodayDate() {
     return new Date().toISOString().split('T')[0];
 }
 
+function formatAdminContent(gameKey, storedQuestions) {
+    if (!storedQuestions) return null;
+    if (gameKey === 'wordle' || gameKey === 'unscramble') {
+        return { word: unwrapWordContent(storedQuestions, null) };
+    }
+    return { questions: unwrapQuizQuestions(storedQuestions, null) };
+}
+
 /**
  * POST /api/admin/games/:gameType
- * Creates or updates daily game content for the given gameType and date.
+ * Creates or updates daily_questions content for the given game_key and date.
  */
 exports.setDailyGame = async (req, res, next) => {
     try {
-        const { gameType } = req.params;
-        if (!VALID_GAMES.includes(gameType)) {
+        const gameKey = normalizeGameKey(req.params.gameType);
+        if (!gameKey || !DAILY_QUESTION_KEYS.has(gameKey)) {
             return res.status(400).json({ error: 'Invalid game type' });
         }
 
         const targetDate = req.body.date || getTodayDate();
-        let content;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+            return res.status(400).json({ error: 'Date must be YYYY-MM-DD' });
+        }
 
-        if (gameType === 'wordle') {
+        let questionsPayload;
+
+        if (gameKey === 'wordle') {
             const word = (req.body.word || '').trim().toUpperCase();
             if (!/^[A-Z]{5}$/.test(word)) {
                 return res.status(400).json({ error: 'Wordle word must be exactly 5 letters' });
             }
-            content = { word };
-        } else if (gameType === 'unscramble') {
+            questionsPayload = { word };
+        } else if (gameKey === 'unscramble') {
             const word = (req.body.word || '').trim().toUpperCase();
             if (word.length < 2) {
                 return res.status(400).json({ error: 'Unscramble word must be at least 2 letters' });
             }
-            content = { word };
+            questionsPayload = { word };
         } else {
             const { questions } = req.body;
             if (!Array.isArray(questions) || questions.length !== 5) {
@@ -51,24 +68,52 @@ exports.setDailyGame = async (req, res, next) => {
             if (!valid) {
                 return res.status(400).json({ error: 'All question fields and 4 options must be filled' });
             }
-            content = { questions };
+            questionsPayload = questions.map((item) => ({
+                q: item.q.trim(),
+                options: item.options.map((o) => o.trim()),
+                answer: item.answer.trim(),
+                ...(item.code !== undefined && item.code !== '' ? { code: String(item.code) } : {}),
+            }));
         }
 
-        const { error } = await supabase
-            .from('daily_games')
-            .upsert(
-                {
+        const { data: existing, error: fetchErr } = await supabase
+            .from('daily_questions')
+            .select('id')
+            .eq('game_key', gameKey)
+            .eq('game_date', targetDate)
+            .maybeSingle();
+
+        if (fetchErr) throw fetchErr;
+
+        if (existing) {
+            const { error: updErr } = await supabase
+                .from('daily_questions')
+                .update({
+                    questions: questionsPayload,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', existing.id);
+
+            if (updErr) throw updErr;
+        } else {
+            const { error: insErr } = await supabase
+                .from('daily_questions')
+                .insert({
+                    game_key: gameKey,
                     game_date: targetDate,
-                    game_type: gameType,
-                    content,
-                    created_by: req.user.id,
-                },
-                { onConflict: 'game_date,game_type' }
-            );
+                    questions: questionsPayload,
+                    updated_at: new Date().toISOString(),
+                });
 
-        if (error) throw error;
+            if (insErr) throw insErr;
+        }
 
-        return res.json({ success: true, message: `${gameType} saved for ${targetDate}` });
+        return res.json({
+            success: true,
+            gameKey,
+            date: targetDate,
+            message: `${gameKey} saved for ${targetDate}`,
+        });
     } catch (err) {
         next(err);
     }
@@ -76,26 +121,34 @@ exports.setDailyGame = async (req, res, next) => {
 
 /**
  * GET /api/admin/games/:gameType
- * Retrieves configured daily game content for a date (defaults to today).
+ * Retrieves configured daily_questions content for a date (defaults to today).
  */
 exports.getDailyGame = async (req, res, next) => {
     try {
-        const { gameType } = req.params;
-        if (!VALID_GAMES.includes(gameType)) {
+        const gameKey = normalizeGameKey(req.params.gameType);
+        if (!gameKey || !DAILY_QUESTION_KEYS.has(gameKey)) {
             return res.status(400).json({ error: 'Invalid game type' });
         }
 
         const targetDate = req.query.date || getTodayDate();
         const { data, error } = await supabase
-            .from('daily_games')
-            .select('content')
+            .from('daily_questions')
+            .select('questions')
+            .eq('game_key', gameKey)
             .eq('game_date', targetDate)
-            .eq('game_type', gameType)
             .maybeSingle();
 
         if (error) throw error;
 
-        return res.json({ content: data?.content || null, date: targetDate });
+        const stored = data?.questions || null;
+        const fallback = getDefaultContentForKey(gameKey);
+
+        return res.json({
+            content: stored ? formatAdminContent(gameKey, stored) : null,
+            defaults: formatAdminContent(gameKey, fallback),
+            gameKey,
+            date: targetDate,
+        });
     } catch (err) {
         next(err);
     }

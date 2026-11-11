@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Routes, Route, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Routes, Route, Link } from 'react-router-dom';
 import PixelCard from '../components/PixelCard';
 import api from '../services/api';
 import './GamesPage.css';
@@ -12,6 +12,7 @@ import AdminPanel from './games/AdminPanel';
 import UnscrambleGame from './games/UnscrambleGame';
 import EnglishFluencyGame from './games/EnglishFluencyGame';
 import GuessOutputGame from './games/GuessOutputGame';
+import QueryQuest from './games/QueryQuest';
 
 const GamesOverview = ({ user, points }) => {
     return (
@@ -76,6 +77,13 @@ const GamesOverview = ({ user, points }) => {
                         <p>Evaluate code. +50 PTS</p>
                     </PixelCard>
                 </Link>
+                <Link to="/games/query-quest" className="game-card-link cursor-target">
+                    <PixelCard className="game-card">
+                        <div className="game-icon bounce">🗄️</div>
+                        <h3>QUERY QUEST</h3>
+                        <p>6 SQL Missions. Real DB. +60 PTS</p>
+                    </PixelCard>
+                </Link>
             </div>
         </div>
     );
@@ -83,7 +91,8 @@ const GamesOverview = ({ user, points }) => {
 
 const GamesPage = () => {
     const navigate = useNavigate();
-    const [user] = useState(() => {
+    const location = useLocation();
+    const [user, setUser] = useState(() => {
         const storedUser = localStorage.getItem('pixelQuestUser');
         const token = localStorage.getItem('pq_token');
         if (!storedUser || !token) return null;
@@ -102,6 +111,25 @@ const GamesPage = () => {
             return;
         }
 
+        api.getMe()
+            .then((me) => {
+                if (me?.user) {
+                    localStorage.setItem('pixelQuestUser', JSON.stringify(me.user));
+                    setUser(me.user);
+                }
+            })
+            .catch((err) => {
+                if (err.status === 401) {
+                    api.logout();
+                    navigate('/signin');
+                }
+            });
+        // Verify auth token on mount
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (!user) return;
         api.getGamesStatus()
             .then((data) => {
                 setTodayPoints(data.todayPoints || 0);
@@ -113,7 +141,7 @@ const GamesPage = () => {
                     navigate('/signin');
                 }
             });
-    }, [navigate, user]);
+    }, [navigate, user, location.pathname]);
 
     if (!user) return null;
 
@@ -127,6 +155,7 @@ const GamesPage = () => {
                 <Route path="/unscramble" element={<UnscrambleGame user={user} setTodayPoints={setTodayPoints} />} />
                 <Route path="/fluency" element={<EnglishFluencyGame user={user} setTodayPoints={setTodayPoints} />} />
                 <Route path="/output" element={<GuessOutputGame user={user} setTodayPoints={setTodayPoints} />} />
+                <Route path="/query-quest" element={<QueryQuest user={user} setTodayPoints={setTodayPoints} />} />
                 {user.isAdmin && <Route path="/admin" element={<AdminPanel />} />}
             </Routes>
         </div>

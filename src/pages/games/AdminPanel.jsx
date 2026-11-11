@@ -1,9 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PixelCard from '../../components/PixelCard';
 import PixelButton from '../../components/PixelButton';
+import QueryQuestManager from '../../components/queryQuest/QueryQuestManager';
 import api from '../../services/api';
 import './AdminPanel.css';
+
+const initQuestions = () =>
+    Array.from({ length: 5 }, () => ({ q: '', options: ['', '', '', ''], answer: '' }));
+
+const initOutputQuestions = () =>
+    Array.from({ length: 5 }, () => ({ q: '', code: '', options: ['', '', '', ''], answer: '' }));
 
 const AdminPanel = () => {
     const today = new Date().toISOString().split('T')[0];
@@ -14,64 +21,88 @@ const AdminPanel = () => {
     // Wordle State
     const [wordleWord, setWordleWord] = useState('');
 
-    // Quiz State Helper
-    const initQuestions = () => Array(5).fill({ q: '', options: ['', '', '', ''], answer: '' });
-    const initOutputQuestions = () => Array(5).fill({ q: '', code: '', options: ['', '', '', ''], answer: '' });
+    // Quiz States
+    const [aptitudeQs, setAptitudeQs] = useState(initQuestions);
+    const [techQs, setTechQs] = useState(initQuestions);
 
-    // Old Games State
-    const [aptitudeQs, setAptitudeQs] = useState(initQuestions());
-    const [techQs, setTechQs] = useState(initQuestions());
-
-    // New Games State
+    // Scramble & Fluency & Output States
     const [unscrambleWord, setUnscrambleWord] = useState('');
-    const [fluencyQs, setFluencyQs] = useState(initQuestions());
-    const [outputQs, setOutputQs] = useState(initOutputQuestions());
+    const [fluencyQs, setFluencyQs] = useState(initQuestions);
+    const [outputQs, setOutputQs] = useState(initOutputQuestions);
+
+    useEffect(() => {
+        if (activeTab === 'queryquest') return;
+        let cancelled = false;
+        api.getDailyGame(activeTab, today)
+            .then((data) => {
+                if (cancelled) return;
+                const payload = data?.content;
+                if (!payload) return;
+
+                if (activeTab === 'wordle' && payload.word) {
+                    setWordleWord(payload.word);
+                } else if (activeTab === 'unscramble' && payload.word) {
+                    setUnscrambleWord(payload.word);
+                } else if (Array.isArray(payload.questions) && payload.questions.length === 5) {
+                    if (activeTab === 'aptitude') setAptitudeQs(payload.questions);
+                    if (activeTab === 'tech') setTechQs(payload.questions);
+                    if (activeTab === 'fluency') setFluencyQs(payload.questions);
+                    if (activeTab === 'output') setOutputQs(payload.questions);
+                }
+            })
+            .catch((err) => {
+                console.error(`Failed to load saved ${activeTab} config:`, err);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [activeTab, today]);
 
     const triggerSuccess = () => {
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 2000);
     };
 
-    const handleSaveWord = async (e, keyPrefix, word) => {
+    const handleSaveWord = async (e, word) => {
         e.preventDefault();
-        if (word.length >= 2) {
+        if (word.trim().length >= 2) {
             try {
-                await api.setDailyGame('unscramble', { word: word.toUpperCase(), date: today });
+                await api.setDailyGame('unscramble', { word: word.trim().toUpperCase(), date: today });
                 triggerSuccess();
             } catch (err) {
                 alert(err.message || 'Failed to save word');
             }
         } else {
-            alert("Word must be at least 2 letters");
+            alert('Word must be at least 2 letters');
         }
     };
 
     const handleSaveWordle = async (e) => {
         e.preventDefault();
-        if (wordleWord.length === 5) {
+        if (wordleWord.trim().length === 5) {
             try {
-                await api.setDailyGame('wordle', { word: wordleWord.toUpperCase(), date: today });
+                await api.setDailyGame('wordle', { word: wordleWord.trim().toUpperCase(), date: today });
                 triggerSuccess();
             } catch (err) {
                 alert(err.message || 'Failed to save Wordle word');
             }
         } else {
-            alert("Word must be exactly 5 letters");
+            alert('Word must be exactly 5 letters');
         }
     };
 
-    const handleSaveQuiz = async (e, type, questions) => {
+    const handleSaveQuiz = async (e, gameKey, questions) => {
         e.preventDefault();
-        const isValid = questions.every(q => q.q && q.answer && q.options.every(o => o));
+        const isValid = questions.every((q) => q.q && q.answer && q.options.every((o) => o));
         if (isValid) {
             try {
-                await api.setDailyGame(type, { questions, date: today });
+                await api.setDailyGame(gameKey, { questions, date: today });
                 triggerSuccess();
             } catch (err) {
                 alert(err.message || 'Failed to save quiz');
             }
         } else {
-            alert("All fields must be filled!");
+            alert('All fields must be filled!');
         }
     };
 
@@ -89,8 +120,8 @@ const AdminPanel = () => {
         setQs(newQs);
     };
 
-    const renderQuizForm = (qs, setQs, type) => (
-        <form onSubmit={(e) => handleSaveQuiz(e, type, qs)} className="admin-form">
+    const renderQuizForm = (qs, setQs, gameKey, label) => (
+        <form onSubmit={(e) => handleSaveQuiz(e, gameKey, qs)} className="admin-form">
             {qs.map((q, i) => (
                 <div key={i} className="admin-q-block pixel-border">
                     <label>Q{i + 1}:</label>
@@ -122,12 +153,12 @@ const AdminPanel = () => {
                     />
                 </div>
             ))}
-            <PixelButton type="submit" className="cursor-target">SAVE {type.toUpperCase()} QUIZ</PixelButton>
+            <PixelButton type="submit" className="cursor-target">SAVE {label} QUIZ</PixelButton>
         </form>
     );
 
-    const renderOutputQuizForm = (qs, setQs, type) => (
-        <form onSubmit={(e) => handleSaveQuiz(e, type, qs)} className="admin-form">
+    const renderOutputQuizForm = (qs, setQs, gameKey) => (
+        <form onSubmit={(e) => handleSaveQuiz(e, gameKey, qs)} className="admin-form">
             {qs.map((q, i) => (
                 <div key={i} className="admin-q-block pixel-border">
                     <label>Q{i + 1}:</label>
@@ -192,8 +223,8 @@ const AdminPanel = () => {
                         onClick={() => setActiveTab('aptitude')}
                     >APTITUDE</button>
                     <button
-                        className={`tab-btn cursor-target ${activeTab === 'techquiz' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('techquiz')}
+                        className={`tab-btn cursor-target ${activeTab === 'tech' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('tech')}
                     >TECH QUEST</button>
                     <button
                         className={`tab-btn cursor-target ${activeTab === 'unscramble' ? 'active' : ''}`}
@@ -207,6 +238,10 @@ const AdminPanel = () => {
                         className={`tab-btn cursor-target ${activeTab === 'output' ? 'active' : ''}`}
                         onClick={() => setActiveTab('output')}
                     >OUTPUT</button>
+                    <button
+                        className={`tab-btn cursor-target ${activeTab === 'queryquest' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('queryquest')}
+                    >QUERY QUEST</button>
                 </div>
 
                 <div className="admin-content">
@@ -225,7 +260,7 @@ const AdminPanel = () => {
                     )}
 
                     {activeTab === 'unscramble' && (
-                        <form onSubmit={(e) => handleSaveWord(e, 'pq_unscramble_word', unscrambleWord, setUnscrambleWord)} className="admin-form">
+                        <form onSubmit={(e) => handleSaveWord(e, unscrambleWord)} className="admin-form">
                             <label>Today's Unscramble Word:</label>
                             <input
                                 className="pixel-input wordle-admin-input"
@@ -237,10 +272,11 @@ const AdminPanel = () => {
                         </form>
                     )}
 
-                    {activeTab === 'aptitude' && renderQuizForm(aptitudeQs, setAptitudeQs, 'aptitude')}
-                    {activeTab === 'techquiz' && renderQuizForm(techQs, setTechQs, 'techquiz')}
-                    {activeTab === 'fluency' && renderQuizForm(fluencyQs, setFluencyQs, 'fluencyquiz')}
-                    {activeTab === 'output' && renderOutputQuizForm(outputQs, setOutputQs, 'outputquiz')}
+                    {activeTab === 'aptitude' && renderQuizForm(aptitudeQs, setAptitudeQs, 'aptitude', 'APTITUDE')}
+                    {activeTab === 'tech' && renderQuizForm(techQs, setTechQs, 'tech', 'TECH QUEST')}
+                    {activeTab === 'fluency' && renderQuizForm(fluencyQs, setFluencyQs, 'fluency', 'FLUENCY')}
+                    {activeTab === 'output' && renderOutputQuizForm(outputQs, setOutputQs, 'output')}
+                    {activeTab === 'queryquest' && <QueryQuestManager defaultDate={today} onSaved={triggerSuccess} />}
                 </div>
 
                 {showSuccess && (

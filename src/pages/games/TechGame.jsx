@@ -12,7 +12,7 @@ const TechGame = ({ setTodayPoints }) => {
     const [gameState, setGameState] = useState('loading');
 
     useEffect(() => {
-        api.getQuiz('techquiz')
+        api.getQuiz('tech')
             .then((data) => {
                 if (data.alreadyPlayed) {
                     setGameState('already_played');
@@ -36,7 +36,7 @@ const TechGame = ({ setTodayPoints }) => {
             setCurrentIndex(currentIndex + 1);
         } else {
             try {
-                const data = await api.submitQuiz('techquiz', newAnswers);
+                const data = await api.submitQuiz('tech', newAnswers);
                 setScore(data.score);
                 setGameState('completed');
                 setTodayPoints(prev => (typeof prev === 'number' ? prev : 0) + (data.score || 0));

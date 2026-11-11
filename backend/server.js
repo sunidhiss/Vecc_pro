@@ -7,6 +7,8 @@ const authRoutes = require('./routes/auth');
 const gamesRoutes = require('./routes/games');
 const leaderboardRoutes = require('./routes/leaderboard');
 const adminRoutes = require('./routes/admin');
+const queryQuestRoutes = require('./routes/queryQuest');
+const adminQueryQuestRoutes = require('./routes/adminQueryQuest');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -17,7 +19,7 @@ app.use(
         credentials: true,
     })
 );
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -35,6 +37,8 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/games', gamesRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/query-quest', queryQuestRoutes);
+app.use('/api/admin/query-quest', adminQueryQuestRoutes);
 
 app.use((err, req, res, _next) => {
     console.error('Server error:', err);

@@ -12,7 +12,7 @@ const EnglishFluencyGame = ({ setTodayPoints }) => {
     const [gameState, setGameState] = useState('loading');
 
     useEffect(() => {
-        api.getQuiz('fluencyquiz')
+        api.getQuiz('fluency')
             .then((data) => {
                 if (data.alreadyPlayed) {
                     setGameState('already_played');
@@ -36,7 +36,7 @@ const EnglishFluencyGame = ({ setTodayPoints }) => {
             setCurrentIndex(currentIndex + 1);
         } else {
             try {
-                const data = await api.submitQuiz('fluencyquiz', newAnswers);
+                const data = await api.submitQuiz('fluency', newAnswers);
                 setScore(data.score);
                 setGameState('completed');
                 setTodayPoints(prev => (typeof prev === 'number' ? prev : 0) + (data.score || 0));

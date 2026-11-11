@@ -1,22 +1,44 @@
 const supabase = require('../config/supabase');
-const DEFAULTS = require('../utils/defaults');
-
-const QUIZ_TYPES = ['aptitude', 'techquiz', 'fluencyquiz', 'outputquiz'];
+const {
+    QUIZ_GAME_KEYS,
+    normalizeGameKey,
+    isAttemptCompleted,
+    getDefaultContentForKey,
+    unwrapWordContent,
+    unwrapQuizQuestions,
+    syncUserStatistics,
+} = require('../utils/gameKeys');
 
 function getTodayDate() {
     return new Date().toISOString().split('T')[0];
 }
 
-async function getDailyGameContent(gameType, date = getTodayDate()) {
+function getISTDate() {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(new Date());
+}
+
+async function getDailyGameQuestions(rawGameType, date = getTodayDate()) {
+    const gameKey = normalizeGameKey(rawGameType);
     const { data, error } = await supabase
-        .from('daily_games')
-        .select('content')
+        .from('daily_questions')
+        .select('questions')
+        .eq('game_key', gameKey)
         .eq('game_date', date)
-        .eq('game_type', gameType)
         .maybeSingle();
 
     if (error) throw error;
-    return data?.content || DEFAULTS[gameType];
+    const stored = data?.questions || null;
+    const fallback = getDefaultContentForKey(gameKey);
+
+    if (gameKey === 'wordle' || gameKey === 'unscramble') {
+        return { word: unwrapWordContent(stored, fallback) };
+    }
+    return { questions: unwrapQuizQuestions(stored, fallback) };
 }
 
 /**
@@ -65,15 +87,17 @@ function scrambleWord(word) {
 
 /**
  * GET /api/games/today
- * Returns today's points, total points, and completion status for each game.
+ * Returns today's points, total points, and completion status for all 7 games from game_attempts.
  */
 exports.getStatus = async (req, res, next) => {
     try {
         const today = getTodayDate();
-        const { data: sessions, error } = await supabase
-            .from('game_sessions')
-            .select('game_date, game_type, score, completed')
-            .eq('user_id', req.user.id);
+        const istToday = getISTDate();
+
+        const { data: attempts, error } = await supabase
+            .from('game_attempts')
+            .select('game_date, game_key, score, metadata')
+            .eq('usn', req.user.usn);
 
         if (error) throw error;
 
@@ -82,19 +106,28 @@ exports.getStatus = async (req, res, next) => {
         const played = {
             wordle: false,
             aptitude: false,
-            techquiz: false,
-            fluencyquiz: false,
-            outputquiz: false,
+            tech: false,
             unscramble: false,
+            fluency: false,
+            output: false,
+            query_quest: false,
         };
 
-        for (const s of sessions || []) {
-            if (s.completed) {
-                totalPoints += s.score || 0;
-                if (s.game_date === today) {
-                    todayPoints += s.score || 0;
-                    if (Object.prototype.hasOwnProperty.call(played, s.game_type)) {
-                        played[s.game_type] = true;
+        for (const a of attempts || []) {
+            const key = normalizeGameKey(a.game_key);
+            if (!key) continue;
+
+            if (isAttemptCompleted(a)) {
+                const pts = Number(a.score) || 0;
+                totalPoints += pts;
+                const isToday = key === 'query_quest' ? a.game_date === istToday : a.game_date === today;
+                if (isToday) {
+                    todayPoints += pts;
+                    if (key === 'query_quest') {
+                        // Mark completed once any or all missions are done; metadata tracks count
+                        played.query_quest = Boolean(a.metadata?.allCompleted ?? (pts > 0));
+                    } else if (Object.prototype.hasOwnProperty.call(played, key)) {
+                        played[key] = true;
                     }
                 }
             }
@@ -108,31 +141,31 @@ exports.getStatus = async (req, res, next) => {
 
 /**
  * GET /api/games/wordle
- * Checks daily Wordle status and restores in-progress guesses if any.
+ * Checks daily Wordle status in game_attempts and restores in-progress guesses if any.
  */
 exports.getWordle = async (req, res, next) => {
     try {
         const today = getTodayDate();
-        const { data: session, error } = await supabase
-            .from('game_sessions')
-            .select('completed, details')
-            .eq('user_id', req.user.id)
+        const { data: attempt, error } = await supabase
+            .from('game_attempts')
+            .select('score, metadata')
+            .eq('usn', req.user.usn)
             .eq('game_date', today)
-            .eq('game_type', 'wordle')
+            .eq('game_key', 'wordle')
             .maybeSingle();
 
         if (error) throw error;
 
-        if (session?.completed) {
+        if (attempt && isAttemptCompleted(attempt)) {
             return res.json({ alreadyPlayed: true });
         }
 
-        if (session && !session.completed) {
+        if (attempt && !isAttemptCompleted(attempt)) {
             return res.json({
                 alreadyPlayed: false,
                 inProgress: true,
-                guesses: session.details?.guesses || [],
-                results: session.details?.results || [],
+                guesses: attempt.metadata?.guesses || [],
+                results: attempt.metadata?.results || [],
                 wordLength: 5,
                 maxGuesses: 6,
             });
@@ -151,7 +184,7 @@ exports.getWordle = async (req, res, next) => {
 
 /**
  * POST /api/games/wordle/guess
- * Validates and evaluates a single 5-letter Wordle guess server-side.
+ * Evaluates a 5-letter Wordle guess server-side and persists progress/score in game_attempts.
  */
 exports.submitWordleGuess = async (req, res, next) => {
     try {
@@ -162,24 +195,24 @@ exports.submitWordleGuess = async (req, res, next) => {
 
         const today = getTodayDate();
         const { data: existing, error: fetchErr } = await supabase
-            .from('game_sessions')
-            .select('id, completed, details')
-            .eq('user_id', req.user.id)
+            .from('game_attempts')
+            .select('id, score, metadata')
+            .eq('usn', req.user.usn)
             .eq('game_date', today)
-            .eq('game_type', 'wordle')
+            .eq('game_key', 'wordle')
             .maybeSingle();
 
         if (fetchErr) throw fetchErr;
-        if (existing?.completed) {
+        if (existing && isAttemptCompleted(existing)) {
             return res.status(400).json({ error: 'You already played Wordle today!' });
         }
 
-        const content = await getDailyGameContent('wordle', today);
+        const content = await getDailyGameQuestions('wordle', today);
         const targetWord = (content.word || 'FLAME').toUpperCase();
         const result = evaluateGuess(rawGuess, targetWord);
 
-        const prevGuesses = existing?.details?.guesses || [];
-        const prevResults = existing?.details?.results || [];
+        const prevGuesses = existing?.metadata?.guesses || [];
+        const prevResults = existing?.metadata?.results || [];
         const guesses = [...prevGuesses, rawGuess];
         const results = [...prevResults, result];
 
@@ -187,34 +220,46 @@ exports.submitWordleGuess = async (req, res, next) => {
         const gameOver = won || guesses.length >= 6;
         const score = won ? 50 : gameOver ? 5 : 0;
 
-        const details = { guesses, results };
+        const metadata = {
+            guesses,
+            results,
+            won,
+            completed: gameOver,
+            ...(gameOver ? { word: targetWord } : {}),
+        };
 
         if (existing) {
             const { error: updateErr } = await supabase
-                .from('game_sessions')
+                .from('game_attempts')
                 .update({
                     score,
-                    completed: gameOver,
-                    details,
-                    completed_at: gameOver ? new Date().toISOString() : null,
+                    metadata,
+                    ...(gameOver ? { completed_at: new Date().toISOString() } : {}),
                 })
                 .eq('id', existing.id);
 
             if (updateErr) throw updateErr;
         } else {
             const { error: insertErr } = await supabase
-                .from('game_sessions')
+                .from('game_attempts')
                 .insert({
-                    user_id: req.user.id,
+                    usn: req.user.usn,
                     game_date: today,
-                    game_type: 'wordle',
+                    game_key: 'wordle',
                     score,
-                    completed: gameOver,
-                    details,
-                    completed_at: gameOver ? new Date().toISOString() : null,
+                    metadata,
                 });
 
-            if (insertErr) throw insertErr;
+            if (insertErr) {
+                if (insertErr.code === '23505') {
+                    return res.status(400).json({ error: 'You already played Wordle today!' });
+                }
+                throw insertErr;
+            }
+        }
+
+        if (gameOver) {
+            await syncUserStatistics(supabase, req.user.usn);
         }
 
         return res.json({
@@ -231,30 +276,30 @@ exports.submitWordleGuess = async (req, res, next) => {
 
 /**
  * GET /api/games/quiz/:type
- * Serves today's quiz questions without revealing correct answers.
+ * Serves today's daily_questions quiz without revealing correct answers.
  */
 exports.getQuiz = async (req, res, next) => {
     try {
-        const { type } = req.params;
-        if (!QUIZ_TYPES.includes(type)) {
+        const gameKey = normalizeGameKey(req.params.type);
+        if (!gameKey || !QUIZ_GAME_KEYS.has(gameKey)) {
             return res.status(400).json({ error: 'Invalid quiz type' });
         }
 
         const today = getTodayDate();
-        const { data: session, error } = await supabase
-            .from('game_sessions')
-            .select('completed')
-            .eq('user_id', req.user.id)
+        const { data: attempt, error } = await supabase
+            .from('game_attempts')
+            .select('id, metadata')
+            .eq('usn', req.user.usn)
             .eq('game_date', today)
-            .eq('game_type', type)
+            .eq('game_key', gameKey)
             .maybeSingle();
 
         if (error) throw error;
-        if (session?.completed) {
+        if (attempt && isAttemptCompleted(attempt)) {
             return res.json({ alreadyPlayed: true });
         }
 
-        const content = await getDailyGameContent(type, today);
+        const content = await getDailyGameQuestions(gameKey, today);
         const safeQuestions = (content.questions || []).map(({ q, options, code }) => ({
             q,
             options,
@@ -272,14 +317,14 @@ exports.getQuiz = async (req, res, next) => {
 
 /**
  * POST /api/games/quiz/:type/submit
- * Grades submitted quiz answers server-side and records the session score.
+ * Grades submitted quiz answers server-side and saves one daily score to game_attempts.
  */
 exports.submitQuiz = async (req, res, next) => {
     try {
-        const { type } = req.params;
+        const gameKey = normalizeGameKey(req.params.type);
         const { answers } = req.body;
 
-        if (!QUIZ_TYPES.includes(type)) {
+        if (!gameKey || !QUIZ_GAME_KEYS.has(gameKey)) {
             return res.status(400).json({ error: 'Invalid quiz type' });
         }
         if (!Array.isArray(answers)) {
@@ -288,19 +333,19 @@ exports.submitQuiz = async (req, res, next) => {
 
         const today = getTodayDate();
         const { data: existing, error: fetchErr } = await supabase
-            .from('game_sessions')
-            .select('completed')
-            .eq('user_id', req.user.id)
+            .from('game_attempts')
+            .select('id, metadata')
+            .eq('usn', req.user.usn)
             .eq('game_date', today)
-            .eq('game_type', type)
+            .eq('game_key', gameKey)
             .maybeSingle();
 
         if (fetchErr) throw fetchErr;
-        if (existing?.completed) {
+        if (existing && isAttemptCompleted(existing)) {
             return res.status(400).json({ error: 'You already played this quiz today!' });
         }
 
-        const content = await getDailyGameContent(type, today);
+        const content = await getDailyGameQuestions(gameKey, today);
         const questions = content.questions || [];
         let score = 0;
         const correctAnswers = questions.map((q, idx) => {
@@ -311,17 +356,28 @@ exports.submitQuiz = async (req, res, next) => {
         });
 
         const { error: insertErr } = await supabase
-            .from('game_sessions')
+            .from('game_attempts')
             .insert({
-                user_id: req.user.id,
+                usn: req.user.usn,
                 game_date: today,
-                game_type: type,
+                game_key: gameKey,
                 score,
-                completed: true,
-                details: { answers },
+                completed_at: new Date().toISOString(),
+                metadata: {
+                    completed: true,
+                    answers,
+                    totalQuestions: questions.length,
+                },
             });
 
-        if (insertErr) throw insertErr;
+        if (insertErr) {
+            if (insertErr.code === '23505') {
+                return res.status(400).json({ error: 'You already played this quiz today!' });
+            }
+            throw insertErr;
+        }
+
+        await syncUserStatistics(supabase, req.user.usn);
 
         return res.json({
             score,
@@ -335,30 +391,30 @@ exports.submitQuiz = async (req, res, next) => {
 
 /**
  * GET /api/games/unscramble
- * Serves today's scrambled word (hiding the original).
+ * Serves today's scrambled word from daily_questions without revealing the original word.
  */
 exports.getUnscramble = async (req, res, next) => {
     try {
         const today = getTodayDate();
-        const { data: session, error } = await supabase
-            .from('game_sessions')
-            .select('completed, details')
-            .eq('user_id', req.user.id)
+        const { data: attempt, error } = await supabase
+            .from('game_attempts')
+            .select('metadata')
+            .eq('usn', req.user.usn)
             .eq('game_date', today)
-            .eq('game_type', 'unscramble')
+            .eq('game_key', 'unscramble')
             .maybeSingle();
 
         if (error) throw error;
-        if (session?.completed) {
+        if (attempt && isAttemptCompleted(attempt)) {
             return res.json({
                 alreadyPlayed: true,
-                win: Boolean(session.details?.win),
-                word: session.details?.word || '',
+                win: Boolean(attempt.metadata?.win),
+                word: attempt.metadata?.word || '',
                 date: today,
             });
         }
 
-        const content = await getDailyGameContent('unscramble', today);
+        const content = await getDailyGameQuestions('unscramble', today);
         const targetWord = (content.word || 'REACT').toUpperCase();
 
         return res.json({
@@ -373,7 +429,7 @@ exports.getUnscramble = async (req, res, next) => {
 
 /**
  * POST /api/games/unscramble/submit
- * Validates the single-attempt unscramble guess server-side.
+ * Validates the single-attempt unscramble guess server-side and saves to game_attempts.
  */
 exports.submitUnscramble = async (req, res, next) => {
     try {
@@ -384,35 +440,47 @@ exports.submitUnscramble = async (req, res, next) => {
 
         const today = getTodayDate();
         const { data: existing, error: fetchErr } = await supabase
-            .from('game_sessions')
-            .select('completed')
-            .eq('user_id', req.user.id)
+            .from('game_attempts')
+            .select('id, metadata')
+            .eq('usn', req.user.usn)
             .eq('game_date', today)
-            .eq('game_type', 'unscramble')
+            .eq('game_key', 'unscramble')
             .maybeSingle();
 
         if (fetchErr) throw fetchErr;
-        if (existing?.completed) {
+        if (existing && isAttemptCompleted(existing)) {
             return res.status(400).json({ error: 'You already played Unscramble today!' });
         }
 
-        const content = await getDailyGameContent('unscramble', today);
+        const content = await getDailyGameQuestions('unscramble', today);
         const targetWord = (content.word || 'REACT').toUpperCase();
         const correct = rawGuess === targetWord;
         const score = correct ? 50 : 0;
 
         const { error: insertErr } = await supabase
-            .from('game_sessions')
+            .from('game_attempts')
             .insert({
-                user_id: req.user.id,
+                usn: req.user.usn,
                 game_date: today,
-                game_type: 'unscramble',
+                game_key: 'unscramble',
                 score,
-                completed: true,
-                details: { win: correct, word: targetWord, guess: rawGuess },
+                completed_at: new Date().toISOString(),
+                metadata: {
+                    completed: true,
+                    win: correct,
+                    word: targetWord,
+                    guess: rawGuess,
+                },
             });
 
-        if (insertErr) throw insertErr;
+        if (insertErr) {
+            if (insertErr.code === '23505') {
+                return res.status(400).json({ error: 'You already played Unscramble today!' });
+            }
+            throw insertErr;
+        }
+
+        await syncUserStatistics(supabase, req.user.usn);
 
         return res.json({
             correct,
