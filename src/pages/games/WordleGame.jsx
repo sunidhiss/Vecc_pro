@@ -2,37 +2,90 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PixelCard from '../../components/PixelCard';
 import PixelButton from '../../components/PixelButton';
+import api from '../../services/api';
 import './WordleGame.css';
 
 const WORD_LENGTH = 5;
 const MAX_GUESSES = 6;
 
-const WordleGame = ({ user, setTodayPoints }) => {
+const WordleGame = ({ setTodayPoints }) => {
     const navigate = useNavigate();
-    const today = new Date().toISOString().split('T')[0];
-    const gameKey = `${user.usn}_${today}_wordle`;
 
-    const [targetWord, setTargetWord] = useState('FLAME');
+    const [targetWord, setTargetWord] = useState('');
     const [guesses, setGuesses] = useState(Array(MAX_GUESSES).fill(''));
+    const [results, setResults] = useState(Array(MAX_GUESSES).fill(null));
     const [currentGuess, setCurrentGuess] = useState('');
     const [currentRow, setCurrentRow] = useState(0);
-    const [gameState, setGameState] = useState('playing'); // playing, won, lost, completed
+    const [gameState, setGameState] = useState('loading'); // loading, playing, won, lost, completed
     const [message, setMessage] = useState('');
 
     useEffect(() => {
-        // Load today's word from admin if set
-        const adminWord = localStorage.getItem(`wordle_${today}`);
-        if (adminWord) {
-            setTargetWord(adminWord.toUpperCase());
+        api.getWordle()
+            .then((data) => {
+                if (data.alreadyPlayed) {
+                    setGameState('completed');
+                    setMessage('You already played Wordle today!');
+                    return;
+                }
+                if (data.inProgress && Array.isArray(data.guesses)) {
+                    const restoredGuesses = Array(MAX_GUESSES).fill('');
+                    const restoredResults = Array(MAX_GUESSES).fill(null);
+                    data.guesses.forEach((g, idx) => {
+                        if (idx < MAX_GUESSES) {
+                            restoredGuesses[idx] = g;
+                            restoredResults[idx] = data.results?.[idx] || null;
+                        }
+                    });
+                    setGuesses(restoredGuesses);
+                    setResults(restoredResults);
+                    setCurrentRow(data.guesses.length);
+                }
+                setGameState('playing');
+            })
+            .catch((err) => {
+                console.error('Failed to load Wordle:', err);
+                setMessage(err.message || 'Failed to load game');
+                setGameState('playing');
+            });
+    }, []);
+
+    const submitGuess = async () => {
+        if (currentGuess.length !== WORD_LENGTH) {
+            setMessage('NOT ENOUGH LETTERS');
+            setTimeout(() => setMessage(''), 1500);
+            return;
         }
 
-        // Check if user already played today
-        const status = localStorage.getItem(gameKey);
-        if (status) {
-            setGameState('completed');
-            setMessage('You already played Wordle today!');
+        try {
+            const data = await api.submitWordleGuess(currentGuess);
+
+            const newGuesses = [...guesses];
+            newGuesses[currentRow] = currentGuess;
+            setGuesses(newGuesses);
+
+            const newResults = [...results];
+            newResults[currentRow] = data.result;
+            setResults(newResults);
+
+            if (data.gameOver) {
+                if (data.word) setTargetWord(data.word);
+                if (data.won) {
+                    setGameState('won');
+                    setMessage(`YOU WON! +${data.score} PTS`);
+                } else {
+                    setGameState('lost');
+                    setMessage(`OUT OF TRIES! Word was ${data.word}. +${data.score} PTS`);
+                }
+                setTodayPoints(prev => (typeof prev === 'number' ? prev : 0) + (data.score || 0));
+            } else {
+                setCurrentRow(currentRow + 1);
+                setCurrentGuess('');
+            }
+        } catch (err) {
+            setMessage(err.message || 'ERROR');
+            setTimeout(() => setMessage(''), 1500);
         }
-    }, [today, gameKey]);
+    };
 
     const handleKeyDown = (e) => {
         if (gameState !== 'playing') return;
@@ -63,61 +116,22 @@ const WordleGame = ({ user, setTodayPoints }) => {
         }
     };
 
-    const submitGuess = () => {
-        if (currentGuess.length !== WORD_LENGTH) {
-            setMessage('NOT ENOUGH LETTERS');
-            setTimeout(() => setMessage(''), 1500);
-            return;
-        }
-
-        const newGuesses = [...guesses];
-        newGuesses[currentRow] = currentGuess;
-        setGuesses(newGuesses);
-
-        let won = currentGuess === targetWord;
-
-        if (won) {
-            setGameState('won');
-            setMessage('YOU WON! +50 PTS');
-            awardPoints(50);
-        } else if (currentRow === MAX_GUESSES - 1) {
-            setGameState('lost');
-            setMessage(`OUT OF TRIES! Word was ${targetWord}. +5 PTS`);
-            awardPoints(5);
-        } else {
-            setCurrentRow(currentRow + 1);
-            setCurrentGuess('');
-        }
-    };
-
-    const awardPoints = (points) => {
-        localStorage.setItem(gameKey, 'completed');
-
-        const allPoints = JSON.parse(localStorage.getItem('pq_points')) || {};
-        const userPoints = allPoints[user.usn] || {};
-        const currentPoints = userPoints[today] || 0;
-
-        userPoints[today] = currentPoints + points;
-        allPoints[user.usn] = userPoints;
-
-        localStorage.setItem('pq_points', JSON.stringify(allPoints));
-        setTodayPoints(userPoints[today]);
-    };
-
-    const getLetterColor = (letter, index, rowGuess) => {
-        if (!targetWord.includes(letter)) return 'absent';
-        if (targetWord[index] === letter) return 'correct';
-
-        // Handle yellow (present but wrong spot)
-        // Simplistic evaluation for prototype
-        return 'present';
-    };
-
     const keyboardRows = [
         ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
         ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
         ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '⌫']
     ];
+
+    if (gameState === 'loading') {
+        return (
+            <div className="wordle-container">
+                <PixelCard className="center-card">
+                    <h2 className="glow-text">PIXEL WORDLE</h2>
+                    <p className="message mt-4">LOADING...</p>
+                </PixelCard>
+            </div>
+        );
+    }
 
     if (gameState === 'completed') {
         return (
@@ -151,15 +165,15 @@ const WordleGame = ({ user, setTodayPoints }) => {
 
             <div className="wordle-grid">
                 {guesses.map((guess, i) => {
-                    const isCurrentRow = i === currentRow;
+                    const isCurrentRow = i === currentRow && gameState === 'playing';
                     const displayWord = isCurrentRow ? currentGuess.padEnd(WORD_LENGTH, ' ') : guess.padEnd(WORD_LENGTH, ' ');
 
                     return (
                         <div key={i} className="wordle-row">
                             {displayWord.split('').map((char, j) => {
                                 let statusClass = '';
-                                if (!isCurrentRow && guess) {
-                                    statusClass = getLetterColor(char, j, guess);
+                                if (!isCurrentRow && guess && results[i]) {
+                                    statusClass = results[i][j] || '';
                                 }
                                 return (
                                     <div key={j} className={`wordle-cell ${statusClass} ${isCurrentRow && char !== ' ' ? 'pop' : ''}`}>

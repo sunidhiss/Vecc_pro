@@ -2,72 +2,67 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PixelButton from '../../components/PixelButton';
 import PixelCard from '../../components/PixelCard';
+import api from '../../services/api';
 import './UnscrambleGame.css';
 
-const UnscrambleGame = ({ user, setTodayPoints }) => {
+const UnscrambleGame = ({ setTodayPoints }) => {
     const navigate = useNavigate();
-    const [originalWord, setOriginalWord] = useState('');
     const [scrambledWord, setScrambledWord] = useState('');
     const [guess, setGuess] = useState('');
     const [hasPlayedInfo, setHasPlayedInfo] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [msg, setMsg] = useState('');
 
     useEffect(() => {
-        const today = new Date().toISOString().split('T')[0];
-        const playedRecords = JSON.parse(localStorage.getItem('pq_unscramble_played')) || {};
+        api.getUnscramble()
+            .then((data) => {
+                if (data.alreadyPlayed) {
+                    setHasPlayedInfo({
+                        date: data.date,
+                        win: data.win,
+                        word: data.word,
+                    });
+                } else {
+                    setScrambledWord(data.scrambledWord);
+                }
+            })
+            .catch((err) => {
+                console.error('Failed to load Unscramble:', err);
+                setMsg(err.message || 'Failed to load game');
+            })
+            .finally(() => setLoading(false));
+    }, []);
 
-        if (playedRecords[user.usn] && playedRecords[user.usn].date === today) {
-            setHasPlayedInfo(playedRecords[user.usn]);
-            return;
-        }
-
-        // Fetch daily word or default
-        const word = localStorage.getItem('pq_unscramble_word') || 'REACT';
-        const upperWord = word.toUpperCase();
-        setOriginalWord(upperWord);
-
-        // Scramble the word (ensure it's actually scrambled unless the word is 1 char)
-        let scrambled = upperWord;
-        if (upperWord.length > 1) {
-            let limit = 20;
-            while (scrambled === upperWord && limit > 0) {
-                scrambled = upperWord.split('').sort(() => 0.5 - Math.random()).join('');
-                limit--;
-            }
-        }
-        setScrambledWord(scrambled);
-    }, [user.usn]);
-
-    const handleGuess = () => {
+    const handleGuess = async () => {
         if (!guess.trim()) return;
 
-        const upperGuess = guess.toUpperCase().trim();
-        const isWin = upperGuess === originalWord;
-        const pts = isWin ? 50 : 0;
+        try {
+            const data = await api.submitUnscramble(guess.trim());
+            const today = new Date().toISOString().split('T')[0];
+            const record = { date: today, win: data.correct, word: data.word };
+            setHasPlayedInfo(record);
 
-        const today = new Date().toISOString().split('T')[0];
-
-        // Save played state
-        const playedRecords = JSON.parse(localStorage.getItem('pq_unscramble_played')) || {};
-        const record = { date: today, win: isWin, word: originalWord };
-        playedRecords[user.usn] = record;
-        localStorage.setItem('pq_unscramble_played', JSON.stringify(playedRecords));
-
-        setHasPlayedInfo(record);
-
-        if (isWin) {
-            // Award points
-            const allPoints = JSON.parse(localStorage.getItem('pq_points')) || {};
-            if (!allPoints[user.usn]) allPoints[user.usn] = {};
-            const currentTodayPts = allPoints[user.usn][today] || 0;
-            allPoints[user.usn][today] = currentTodayPts + pts;
-            localStorage.setItem('pq_points', JSON.stringify(allPoints));
-            setTodayPoints(allPoints[user.usn][today]);
-            setMsg('CORRECT! +50 PTS');
-        } else {
-            setMsg(`INCORRECT! The word was ${originalWord}`);
+            if (data.correct) {
+                setTodayPoints(prev => (typeof prev === 'number' ? prev : 0) + (data.score || 0));
+                setMsg('CORRECT! +50 PTS');
+            } else {
+                setMsg(`INCORRECT! The word was ${data.word}`);
+            }
+        } catch (err) {
+            setMsg(err.message || 'ERROR');
         }
     };
+
+    if (loading) {
+        return (
+            <div className="unscramble-container">
+                <PixelCard className="center-card">
+                    <h2 className="glow-text mb-2">UNSCRAMBLE GAME</h2>
+                    <p className="mt-4">LOADING...</p>
+                </PixelCard>
+            </div>
+        );
+    }
 
     if (hasPlayedInfo) {
         return (

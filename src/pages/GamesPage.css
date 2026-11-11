@@ -74,7 +74,7 @@
     align-items: center;
     text-align: center;
     transition: transform 0.2s, box-shadow 0.2s;
-    cursor: crosshair;
+    cursor: none;
     background-color: var(--panel-bg);
     /* Soft frosted background */
     border: 4px solid var(--pixel-border-color);

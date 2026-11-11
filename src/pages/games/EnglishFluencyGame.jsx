@@ -1,72 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import PixelCard from '../../components/PixelCard';
 import PixelButton from '../../components/PixelButton';
+import api from '../../services/api';
 import './AptitudeGame.css'; // Reusing aptitude styles
 
-const defaultFluencyQuestions = [
-    { q: "Choose the correct sentence:", options: ["She don't like apples.", "She doesn't likes apples.", "She doesn't like apples.", "She don't likes apples."], answer: "She doesn't like apples." },
-    { q: "What is the synonym of 'Abundant'?", options: ["Scarce", "Plentiful", "Rare", "Empty"], answer: "Plentiful" },
-    { q: "Identify the adjective: The quick brown fox jumps.", options: ["quick", "fox", "jumps", "The"], answer: "quick" },
-    { q: "Choose the correct spelling:", options: ["Accommodate", "Acommodate", "Accomodate", "Acomodate"], answer: "Accommodate" },
-    { q: "He has been working here ___ 2015.", options: ["for", "since", "from", "until"], answer: "since" }
-];
-
-const EnglishFluencyGame = ({ user, setTodayPoints }) => {
-    const today = new Date().toISOString().split('T')[0];
-    const gameKey = `${user.usn}_${today}_fluency`;
-
-    const [questions, setQuestions] = useState(defaultFluencyQuestions);
+const EnglishFluencyGame = ({ setTodayPoints }) => {
+    const [questions, setQuestions] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [selectedAnswers, setSelectedAnswers] = useState([]);
     const [score, setScore] = useState(0);
-    const [gameState, setGameState] = useState('start');
+    const [gameState, setGameState] = useState('loading');
 
     useEffect(() => {
-        const adminQ = localStorage.getItem(`fluencyquiz_${today}`);
-        if (adminQ) {
-            try {
-                setQuestions(JSON.parse(adminQ));
-            } catch (e) {
-                console.error("Failed to parse admin fluency questions", e);
-            }
-        }
-
-        const status = localStorage.getItem(gameKey);
-        if (status) {
-            setGameState('already_played');
-        }
-    }, [today, gameKey]);
+        api.getQuiz('fluencyquiz')
+            .then((data) => {
+                if (data.alreadyPlayed) {
+                    setGameState('already_played');
+                } else {
+                    setQuestions(data.questions || []);
+                    setGameState('start');
+                }
+            })
+            .catch((err) => {
+                console.error('Failed to load fluency quiz:', err);
+            });
+    }, []);
 
     const startGame = () => setGameState('playing');
 
-    const handleAnswer = (option) => {
-        let newScore = score;
-        if (option === questions[currentIndex].answer) {
-            newScore += 10;
-        }
+    const handleAnswer = async (option) => {
+        const newAnswers = [...selectedAnswers, option];
+        setSelectedAnswers(newAnswers);
 
         if (currentIndex < questions.length - 1) {
-            setScore(newScore);
             setCurrentIndex(currentIndex + 1);
         } else {
-            endGame(newScore);
+            try {
+                const data = await api.submitQuiz('fluencyquiz', newAnswers);
+                setScore(data.score);
+                setGameState('completed');
+                setTodayPoints(prev => (typeof prev === 'number' ? prev : 0) + (data.score || 0));
+            } catch (err) {
+                console.error('Failed to submit fluency quiz:', err);
+                setGameState('completed');
+            }
         }
     };
 
-    const endGame = (finalScore) => {
-        setScore(finalScore);
-        setGameState('completed');
-
-        localStorage.setItem(gameKey, 'completed');
-        const allPoints = JSON.parse(localStorage.getItem('pq_points')) || {};
-        const userPoints = allPoints[user.usn] || {};
-        const currentPoints = userPoints[today] || 0;
-
-        userPoints[today] = currentPoints + finalScore;
-        allPoints[user.usn] = userPoints;
-
-        localStorage.setItem('pq_points', JSON.stringify(allPoints));
-        setTodayPoints(userPoints[today]);
-    };
+    if (gameState === 'loading') {
+        return (
+            <div className="quiz-container">
+                <PixelCard className="center-card">
+                    <h2 className="glow-text">ENGLISH FLUENCY</h2>
+                    <p className="mt-4">LOADING...</p>
+                </PixelCard>
+            </div>
+        );
+    }
 
     if (gameState === 'already_played') {
         return (

@@ -56,8 +56,8 @@ body {
   background-color: var(--bg-sky);
   color: var(--text-main);
   font-family: var(--font-body);
-  /* Custom cursor using data URI for a simple pixel crosshair */
-  cursor: crosshair;
+  /* Hide default cursor — custom TargetCursor component handles it */
+  cursor: none;
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;

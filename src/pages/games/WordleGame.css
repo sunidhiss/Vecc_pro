@@ -103,7 +103,7 @@
     border: 2px solid var(--text-secondary);
     margin: 0;
     padding: 1rem 0.8rem;
-    cursor: crosshair;
+    cursor: none;
     font-size: 1rem;
     border-radius: 0;
     box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.15);

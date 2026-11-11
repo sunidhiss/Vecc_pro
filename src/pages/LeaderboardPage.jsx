@@ -1,85 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import PixelCard from '../components/PixelCard';
+import api from '../services/api';
 import './LeaderboardPage.css';
-
-const generateMockData = () => {
-    // Only generate if empty
-    if (localStorage.getItem('pq_mock_injected')) return;
-
-    const depts = [
-        { c: 'CS', n: 'Computer Science' },
-        { c: 'AD', n: 'AI & Data Science' },
-        { c: 'IS', n: 'Information Science' },
-        { c: 'EC', n: 'Electronics' },
-        { c: 'ME', n: 'Mechanical' },
-        { c: 'CV', n: 'Civil' }
-    ];
-
-    const users = {};
-    const points = {};
-    const today = new Date().toISOString().split('T')[0];
-
-    // Generate 50 random students
-    for (let i = 1; i <= 50; i++) {
-        const d = depts[Math.floor(Math.random() * depts.length)];
-        const usn = `NNM24${d.c}${(i).toString().padStart(3, '0')}`;
-        users[usn] = { usn, department: d.n, year: '24', rollNo: i.toString() };
-
-        // Random points between 10 and 300
-        points[usn] = { [today]: Math.floor(Math.random() * 290) + 10 };
-    }
-
-    // Ensure we don't overwrite real user data if it exists
-    const existingUsers = JSON.parse(localStorage.getItem('pq_users')) || {};
-    const existingPoints = JSON.parse(localStorage.getItem('pq_points')) || {};
-
-    localStorage.setItem('pq_users', JSON.stringify({ ...users, ...existingUsers }));
-    localStorage.setItem('pq_points', JSON.stringify({ ...points, ...existingPoints }));
-    localStorage.setItem('pq_mock_injected', 'true');
-};
 
 const LeaderboardPage = () => {
     const [activeTab, setActiveTab] = useState('students');
     const [students, setStudents] = useState([]);
     const [departments, setDepartments] = useState([]);
-    const [currentUser, setCurrentUser] = useState(null);
+    const [currentUser] = useState(() => {
+        const cUserStr = localStorage.getItem('pixelQuestUser');
+        if (!cUserStr) return null;
+        try {
+            return JSON.parse(cUserStr);
+        } catch {
+            return null;
+        }
+    });
 
     useEffect(() => {
-        generateMockData();
-
-        const cUserStr = localStorage.getItem('pixelQuestUser');
-        if (cUserStr) setCurrentUser(JSON.parse(cUserStr));
-
-        const allUsers = JSON.parse(localStorage.getItem('pq_users')) || {};
-        const allPoints = JSON.parse(localStorage.getItem('pq_points')) || {};
-
-        // Aggregate points
-        const studentList = [];
-        const deptMap = {};
-
-        Object.values(allUsers).forEach(u => {
-            if (u.isAdmin) return; // Skip admins
-
-            const userPts = allPoints[u.usn] || {};
-            const total = Object.values(userPts).reduce((acc, val) => acc + val, 0);
-
-            studentList.push({ ...u, totalPoints: total });
-
-            if (!deptMap[u.department]) {
-                deptMap[u.department] = { name: u.department, totalPoints: 0, activePlayers: 0 };
-            }
-            deptMap[u.department].totalPoints += total;
-            if (total > 0) deptMap[u.department].activePlayers += 1;
-        });
-
-        // Sort students
-        studentList.sort((a, b) => b.totalPoints - a.totalPoints);
-        setStudents(studentList.slice(0, 20)); // Top 20
-
-        // Sort departments
-        const deptList = Object.values(deptMap).sort((a, b) => b.totalPoints - a.totalPoints);
-        setDepartments(deptList);
-
+        Promise.all([
+            api.getStudentLeaderboard(),
+            api.getDepartmentLeaderboard(),
+        ])
+            .then(([studentData, deptData]) => {
+                setStudents(studentData);
+                setDepartments(deptData);
+            })
+            .catch((err) => {
+                console.error('Failed to load leaderboard:', err);
+            });
     }, []);
 
     const getMedal = (index) => {

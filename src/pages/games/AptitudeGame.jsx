@@ -1,85 +1,90 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PixelCard from '../../components/PixelCard';
 import PixelButton from '../../components/PixelButton';
+import api from '../../services/api';
 import './AptitudeGame.css';
 
-const defaultQuestions = [
-    { q: "What is 15% of 200?", options: ["20", "30", "40", "50"], answer: "30" },
-    { q: "If A is faster than B, and B is faster than C. Is A faster than C?", options: ["Yes", "No", "Maybe", "Can't say"], answer: "Yes" },
-    { q: "A train 120m long passes a pole in 6s. Find its speed in m/s.", options: ["10", "15", "20", "25"], answer: "20" },
-    { q: "What is the next number in the series: 2, 6, 12, 20, ... ?", options: ["24", "28", "30", "32"], answer: "30" },
-    { q: "Probability of getting a head when tossing a coin?", options: ["0.25", "0.5", "0.75", "1"], answer: "0.5" }
-];
-
-const AptitudeGame = ({ user, setTodayPoints }) => {
-    const today = new Date().toISOString().split('T')[0];
-    const gameKey = `${user.usn}_${today}_aptitude`;
-
-    const [questions, setQuestions] = useState(defaultQuestions);
+const AptitudeGame = ({ setTodayPoints }) => {
+    const [questions, setQuestions] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [selectedAnswers, setSelectedAnswers] = useState([]);
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(60);
-    const [gameState, setGameState] = useState('start'); // start, playing, completed // completed indicates finished either today or just now
+    const [gameState, setGameState] = useState('loading'); // loading, start, playing, completed, already_played
+    const submittedRef = useRef(false);
 
     useEffect(() => {
-        const adminQ = localStorage.getItem(`aptitude_${today}`);
-        if (adminQ) {
-            try {
-                setQuestions(JSON.parse(adminQ));
-            } catch (e) {
-                console.error("Failed to parse admin aptitude questions", e);
-            }
-        }
+        api.getQuiz('aptitude')
+            .then((data) => {
+                if (data.alreadyPlayed) {
+                    setGameState('already_played');
+                } else {
+                    setQuestions(data.questions || []);
+                    setGameState('start');
+                }
+            })
+            .catch((err) => {
+                console.error('Failed to load aptitude quiz:', err);
+            });
+    }, []);
 
-        const status = localStorage.getItem(gameKey);
-        if (status) {
-            setGameState('already_played');
+    const submitAllAnswers = useCallback(async (answers) => {
+        if (submittedRef.current) return;
+        submittedRef.current = true;
+        try {
+            const data = await api.submitQuiz('aptitude', answers);
+            setScore(data.score);
+            setGameState('completed');
+            setTodayPoints(prev => (typeof prev === 'number' ? prev : 0) + (data.score || 0));
+        } catch (err) {
+            console.error('Failed to submit aptitude quiz:', err);
+            setGameState('completed');
         }
-    }, [today, gameKey]);
+    }, [setTodayPoints]);
 
     useEffect(() => {
-        let timer;
-        if (gameState === 'playing' && timeLeft > 0) {
-            timer = setInterval(() => {
-                setTimeLeft(prev => prev - 1);
-            }, 1000);
-        } else if (gameState === 'playing' && timeLeft === 0) {
-            endGame();
+        if (gameState !== 'playing') return;
+
+        if (timeLeft <= 0) {
+            const timeout = setTimeout(() => {
+                const paddedAnswers = [...selectedAnswers];
+                while (paddedAnswers.length < questions.length) {
+                    paddedAnswers.push('');
+                }
+                submitAllAnswers(paddedAnswers);
+            }, 0);
+            return () => clearTimeout(timeout);
         }
+
+        const timer = setInterval(() => {
+            setTimeLeft(prev => prev - 1);
+        }, 1000);
         return () => clearInterval(timer);
-    }, [gameState, timeLeft]);
+    }, [gameState, timeLeft, selectedAnswers, questions.length, submitAllAnswers]);
 
     const startGame = () => setGameState('playing');
 
     const handleAnswer = (option) => {
-        let newScore = score;
-        if (option === questions[currentIndex].answer) {
-            newScore += 10;
-            setScore(newScore);
-        }
+        const newAnswers = [...selectedAnswers, option];
+        setSelectedAnswers(newAnswers);
 
         if (currentIndex < questions.length - 1) {
             setCurrentIndex(currentIndex + 1);
         } else {
-            // we use a functional update and call endGame outside because state is async
-            endGame(newScore);
+            submitAllAnswers(newAnswers);
         }
     };
 
-    const endGame = (finalScore = score) => {
-        setGameState('completed');
-
-        localStorage.setItem(gameKey, 'completed');
-        const allPoints = JSON.parse(localStorage.getItem('pq_points')) || {};
-        const userPoints = allPoints[user.usn] || {};
-        const currentPoints = userPoints[today] || 0;
-
-        userPoints[today] = currentPoints + finalScore;
-        allPoints[user.usn] = userPoints;
-
-        localStorage.setItem('pq_points', JSON.stringify(allPoints));
-        setTodayPoints(userPoints[today]);
-    };
+    if (gameState === 'loading') {
+        return (
+            <div className="quiz-container">
+                <PixelCard className="center-card">
+                    <h2 className="glow-text">APTITUDE BLITZ</h2>
+                    <p className="mt-4">LOADING...</p>
+                </PixelCard>
+            </div>
+        );
+    }
 
     if (gameState === 'already_played') {
         return (

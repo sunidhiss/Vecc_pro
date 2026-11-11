@@ -4,13 +4,21 @@
     align-items: center;
     background-color: var(--panel-bg);
     margin-bottom: 2rem;
-    padding: 1rem 2rem;
+    padding: 0.8rem 1.5rem;
     border-bottom: 4px solid var(--pixel-border-color);
+    flex-wrap: nowrap;
 }
 
 .nav-links {
     display: flex;
-    gap: 2rem;
+    align-items: center;
+    gap: 1.2rem;
+    flex-wrap: nowrap;
+}
+
+.nav-logo {
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .nav-links a,
@@ -21,7 +29,7 @@
     font-size: 1rem;
     background: none;
     border: none;
-    cursor: crosshair;
+    cursor: none;
 }
 
 .nav-links a:hover,
@@ -38,5 +46,22 @@
 
 .theme-btn {
     margin-left: 10px;
-    cursor: crosshair !important;
+    cursor: none !important;
+    font-size: 1.3rem;
+    background: none;
+    border: 2px solid var(--pixel-border-color);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 0 6px rgba(62, 207, 190, 0.3);
+}
+
+.theme-btn:hover {
+    transform: scale(1.15) translateY(-2px);
+    box-shadow: 0 0 12px rgba(62, 207, 190, 0.6);
 }

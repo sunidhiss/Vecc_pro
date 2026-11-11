@@ -6,7 +6,7 @@
     /* Ensure blocky shape */
     padding: 1rem 2rem;
     font-size: 1rem;
-    cursor: crosshair;
+    cursor: none;
     position: relative;
     box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.15);
     /* Soft drop shadow */

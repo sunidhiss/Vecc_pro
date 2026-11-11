@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PixelCard from '../components/PixelCard';
 import PixelButton from '../components/PixelButton';
+import api from '../services/api';
 import './SignInPage.css';
 
 const SignInPage = () => {
@@ -11,55 +12,22 @@ const SignInPage = () => {
     const [isShake, setIsShake] = useState(false);
     const navigate = useNavigate();
 
-    const parseUSN = (usnString) => {
-        // e.g. NNM24CS001
-        if (usnString.length < 10) return null;
-
-        const year = usnString.substring(3, 5);
-        const deptCode = usnString.substring(5, 7).toUpperCase();
-        const rollNo = usnString.substring(7);
-
-        const deptMap = {
-            'CS': 'Computer Science',
-            'AD': 'AI & Data Science',
-            'IS': 'Information Science',
-            'EC': 'Electronics & Communication',
-            'ME': 'Mechanical Engineering',
-            'CV': 'Civil Engineering',
-        };
-
-        const department = deptMap[deptCode] || 'Unknown Department';
-
-        return { usn: usnString.toUpperCase(), department, year, rollNo, isAdmin: false };
-    };
-
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
 
-        if (usn.toLowerCase() === 'admin' && password === 'hey1234') {
-            const adminUser = { usn: 'ADMIN', department: 'System Admin', isAdmin: true };
-            localStorage.setItem('pixelQuestUser', JSON.stringify(adminUser));
+        try {
+            if (usn.trim().toLowerCase() === 'admin') {
+                await api.adminLogin(password);
+            } else {
+                await api.login(usn.trim());
+            }
             navigate('/games');
-            return;
-        }
-
-        const parsedUser = parseUSN(usn);
-        if (!parsedUser || parsedUser.department === 'Unknown Department') {
-            setError('INVALID ENTRY');
+        } catch (err) {
+            setError(err.message || 'INVALID ENTRY');
             setIsShake(true);
             setTimeout(() => setIsShake(false), 500);
-            return;
         }
-
-        localStorage.setItem('pixelQuestUser', JSON.stringify(parsedUser));
-
-        // Let's also create an entry in the users store if it doesn't exist
-        const allUsers = JSON.parse(localStorage.getItem('pq_users')) || {};
-        allUsers[parsedUser.usn] = parsedUser;
-        localStorage.setItem('pq_users', JSON.stringify(allUsers));
-
-        navigate('/games');
     };
 
     return (

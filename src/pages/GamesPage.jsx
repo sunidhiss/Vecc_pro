@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Routes, Route, Link } from 'react-router-dom';
 import PixelCard from '../components/PixelCard';
+import api from '../services/api';
 import './GamesPage.css';
 
 // Lazy load or inline components for the games (we will build these out)
@@ -82,26 +83,37 @@ const GamesOverview = ({ user, points }) => {
 
 const GamesPage = () => {
     const navigate = useNavigate();
-    const [user, setUser] = useState(null);
+    const [user] = useState(() => {
+        const storedUser = localStorage.getItem('pixelQuestUser');
+        const token = localStorage.getItem('pq_token');
+        if (!storedUser || !token) return null;
+        try {
+            return JSON.parse(storedUser);
+        } catch {
+            return null;
+        }
+    });
     const [todayPoints, setTodayPoints] = useState(0);
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('pixelQuestUser');
-        if (!storedUser) {
+        if (!user) {
+            api.logout();
             navigate('/signin');
             return;
         }
 
-        const parsed = JSON.parse(storedUser);
-        setUser(parsed);
-
-        // Load today's points
-        const today = new Date().toISOString().split('T')[0];
-        const allPoints = JSON.parse(localStorage.getItem('pq_points')) || {};
-        const userPoints = allPoints[parsed.usn] || {};
-        setTodayPoints(userPoints[today] || 0);
-
-    }, [navigate]);
+        api.getGamesStatus()
+            .then((data) => {
+                setTodayPoints(data.todayPoints || 0);
+            })
+            .catch((err) => {
+                console.error('Failed to fetch game status:', err);
+                if (err.status === 401) {
+                    api.logout();
+                    navigate('/signin');
+                }
+            });
+    }, [navigate, user]);
 
     if (!user) return null;
 

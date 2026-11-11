@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PixelCard from '../../components/PixelCard';
 import PixelButton from '../../components/PixelButton';
+import api from '../../services/api';
 import './AdminPanel.css';
 
 const AdminPanel = () => {
@@ -31,36 +32,44 @@ const AdminPanel = () => {
         setTimeout(() => setShowSuccess(false), 2000);
     };
 
-    const handleSaveWord = (e, keyPrefix, word, setWord) => {
+    const handleSaveWord = async (e, keyPrefix, word) => {
         e.preventDefault();
-        if (word.length >= 2) { // Unscramble can be any length >= 2, Wordle must be 5. But let's just use this generic or a specific one.
-            localStorage.setItem(`${keyPrefix}_${today}`, word.toUpperCase());
-            // Since unscramble uses a generic key:
-            if (keyPrefix === 'pq_unscramble_word') {
-                localStorage.setItem('pq_unscramble_word', word.toUpperCase());
+        if (word.length >= 2) {
+            try {
+                await api.setDailyGame('unscramble', { word: word.toUpperCase(), date: today });
+                triggerSuccess();
+            } catch (err) {
+                alert(err.message || 'Failed to save word');
             }
-            triggerSuccess();
         } else {
             alert("Word must be at least 2 letters");
         }
     };
 
-    const handleSaveWordle = (e) => {
+    const handleSaveWordle = async (e) => {
         e.preventDefault();
         if (wordleWord.length === 5) {
-            localStorage.setItem(`wordle_${today}`, wordleWord.toUpperCase());
-            triggerSuccess();
+            try {
+                await api.setDailyGame('wordle', { word: wordleWord.toUpperCase(), date: today });
+                triggerSuccess();
+            } catch (err) {
+                alert(err.message || 'Failed to save Wordle word');
+            }
         } else {
             alert("Word must be exactly 5 letters");
         }
     };
 
-    const handleSaveQuiz = (e, type, questions) => {
+    const handleSaveQuiz = async (e, type, questions) => {
         e.preventDefault();
         const isValid = questions.every(q => q.q && q.answer && q.options.every(o => o));
         if (isValid) {
-            localStorage.setItem(`${type}_${today}`, JSON.stringify(questions));
-            triggerSuccess();
+            try {
+                await api.setDailyGame(type, { questions, date: today });
+                triggerSuccess();
+            } catch (err) {
+                alert(err.message || 'Failed to save quiz');
+            }
         } else {
             alert("All fields must be filled!");
         }
