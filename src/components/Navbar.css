@@ -65,3 +65,21 @@
     transform: scale(1.15) translateY(-2px);
     box-shadow: 0 0 12px rgba(62, 207, 190, 0.6);
 }
+
+@media (max-width: 960px) {
+    .navbar {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .nav-links {
+        flex-wrap: wrap;
+        gap: 0.75rem 0.95rem;
+    }
+
+    .nav-links a,
+    .nav-links button {
+        font-size: 0.85rem;
+    }
+}

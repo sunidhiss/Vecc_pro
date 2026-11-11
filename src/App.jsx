@@ -5,6 +5,7 @@ import SignInPage from './pages/SignInPage';
 import GamesPage from './pages/GamesPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import Team from './Team';
+import DatabaseSchema from './pages/DatabaseSchema';
 import Navbar from './components/Navbar';
 import TargetCursor from './components/TargetCursor';
 
@@ -21,6 +22,7 @@ function App() {
           <Route path="/games/*" element={<GamesPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/team" element={<Team />} />
+          <Route path="/database-schema" element={<DatabaseSchema />} />
         </Routes>
       </div>
     </Router>

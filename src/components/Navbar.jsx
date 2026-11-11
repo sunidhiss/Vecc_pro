@@ -45,6 +45,7 @@ const Navbar = () => {
                 <Link to="/home" className={`cursor-target ${location.pathname === '/home' ? 'active' : ''}`}>HOME</Link>
                 <Link to="/games" className={`cursor-target ${location.pathname === '/games' ? 'active' : ''}`}>GAMES</Link>
                 <Link to="/leaderboard" className={`cursor-target ${location.pathname === '/leaderboard' ? 'active' : ''}`}>LEADERBOARD</Link>
+                <Link to="/database-schema" className={`cursor-target ${location.pathname === '/database-schema' ? 'active' : ''}`}>DATABASE</Link>
                 <Link to="/team" className={`cursor-target ${location.pathname === '/team' ? 'active' : ''}`}>TEAM</Link>
                 {currentUser ? (
                     <button onClick={handleSignOut} className="signout-btn cursor-target">SIGN OUT</button>
