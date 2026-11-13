@@ -22,10 +22,10 @@ function normalizeGameKey(rawKey) {
     return GAME_KEY_ALIASES[key] || null;
 }
 
-function isAttemptCompleted(attempt) {
-    if (!attempt) return false;
-    // Wordle saves in-progress state with metadata.completed === false before gameOver
-    return attempt.metadata?.completed !== false;
+function isScoreCompleted(scoreRow) {
+    if (!scoreRow) return false;
+    // In Wordle, in-progress guesses have details.completed === false
+    return scoreRow.details?.completed !== false;
 }
 
 function getDefaultContentForKey(gameKey) {
@@ -58,82 +58,12 @@ function unwrapQuizQuestions(storedQuestions, fallbackObj) {
     return fallbackObj?.questions || [];
 }
 
-function computeStreaks(sortedDateStrings) {
-    if (!sortedDateStrings.length) {
-        return { currentStreak: 0, longestStreak: 0 };
-    }
-    const dayMs = 24 * 60 * 60 * 1000;
-    const timestamps = sortedDateStrings.map((d) => Date.parse(`${d}T00:00:00Z`));
-
-    let longest = 1;
-    let run = 1;
-    for (let i = 1; i < timestamps.length; i++) {
-        if (timestamps[i] - timestamps[i - 1] === dayMs) {
-            run += 1;
-            if (run > longest) longest = run;
-        } else {
-            run = 1;
-        }
-    }
-
-    let current = 1;
-    for (let i = timestamps.length - 1; i > 0; i--) {
-        if (timestamps[i] - timestamps[i - 1] === dayMs) {
-            current += 1;
-        } else {
-            break;
-        }
-    }
-
-    return { currentStreak: current, longestStreak: longest };
-}
-
-/**
- * Recomputes user_statistics from completed game_attempts for a USN.
- */
-async function syncUserStatistics(supabase, usn) {
-    try {
-        const { data: attempts, error } = await supabase
-            .from('game_attempts')
-            .select('game_date, score, metadata')
-            .eq('usn', usn);
-
-        if (error) throw error;
-
-        const completed = (attempts || []).filter(isAttemptCompleted);
-        const totalPoints = completed.reduce((sum, row) => sum + (Number(row.score) || 0), 0);
-        const gamesCompleted = completed.length;
-
-        const uniqueDates = Array.from(new Set(completed.map((r) => r.game_date).filter(Boolean))).sort();
-        const { currentStreak, longestStreak } = computeStreaks(uniqueDates);
-
-        const { error: upsertErr } = await supabase
-            .from('user_statistics')
-            .upsert(
-                {
-                    usn,
-                    total_points: totalPoints,
-                    games_completed: gamesCompleted,
-                    current_streak: currentStreak,
-                    longest_streak: longestStreak,
-                    updated_at: new Date().toISOString(),
-                },
-                { onConflict: 'usn' }
-            );
-
-        if (upsertErr) throw upsertErr;
-    } catch (err) {
-        console.error('Failed to sync user_statistics:', err.message);
-    }
-}
-
 module.exports = {
     QUIZ_GAME_KEYS,
     DAILY_QUESTION_KEYS,
     normalizeGameKey,
-    isAttemptCompleted,
+    isScoreCompleted,
     getDefaultContentForKey,
     unwrapWordContent,
     unwrapQuizQuestions,
-    syncUserStatistics,
 };

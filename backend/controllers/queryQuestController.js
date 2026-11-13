@@ -4,7 +4,6 @@ const { validateStudentQuery, ValidationError } = require('../services/sqlValida
 const { executeSandboxedQuery } = require('../services/sqlExecutionService');
 const { evaluateQueryResult } = require('../services/queryEvaluationService');
 const { scoreQuerySolution } = require('../services/queryScoringService');
-const { syncUserStatistics } = require('../utils/gameKeys');
 const {
     isValidUuid,
     getISTDate,
@@ -17,9 +16,6 @@ const {
 const MAX_DAILY_MISSIONS = 6;
 const MAX_DAILY_POINTS = 60;
 
-// Prevents concurrent requests on a new IST day from duplicating default missions
-const seedingLocks = new Map();
-
 function sortChallengesByOrder(list) {
     return [...(list || [])].sort(
         (a, b) => unpackChallengeMeta(a).missionOrder - unpackChallengeMeta(b).missionOrder
@@ -27,7 +23,7 @@ function sortChallengesByOrder(list) {
 }
 
 /**
- * Ensures today's IST date has active Query Quest challenges provisioned (seeds defaults if empty).
+ * Ensures today's IST challenges exist in query_quest_challenges.
  */
 async function ensureTodayChallenges(today) {
     const { data: existing, error } = await supabase
@@ -41,71 +37,36 @@ async function ensureTodayChallenges(today) {
         return sortChallengesByOrder(existing).slice(0, MAX_DAILY_MISSIONS);
     }
 
-    if (seedingLocks.has(today)) {
-        await seedingLocks.get(today);
-        const { data: afterWait, error: waitErr } = await supabase
-            .from('query_quest_challenges')
-            .select('*')
-            .eq('challenge_date', today)
-            .eq('is_active', true);
-        if (waitErr) throw waitErr;
-        return sortChallengesByOrder(afterWait).slice(0, MAX_DAILY_MISSIONS);
-    }
+    // Insert default daily challenges if not yet created
+    const rowsToInsert = DEFAULT_MISSIONS.map((m) => ({
+        title: m.title,
+        description: m.description,
+        difficulty: toDbDifficulty(m.difficulty) || 'easy',
+        topic: m.topic,
+        scenario: m.scenario,
+        schema_definition: m.schema_definition,
+        seed_data: m.seed_data,
+        expected_result: packExpectedResult({
+            expectedResult: m.expected_result,
+            missionOrder: m.mission_order,
+            hints: m.hints,
+            explanation: m.explanation,
+            starterQuery: m.starter_query,
+        }),
+        challenge_date: today,
+        points: 10,
+        is_active: true,
+    }));
 
-    const seedPromise = (async () => {
-        const { data: anyForDate, error: checkErr } = await supabase
-            .from('query_quest_challenges')
-            .select('id')
-            .eq('challenge_date', today)
-            .limit(1);
+    await supabase.from('query_quest_challenges').insert(rowsToInsert);
 
-        if (checkErr) throw checkErr;
-        if (anyForDate && anyForDate.length > 0) {
-            return;
-        }
-
-        const rowsToInsert = DEFAULT_MISSIONS.map((m) => ({
-            title: m.title,
-            description: m.description,
-            difficulty: toDbDifficulty(m.difficulty) || 'easy',
-            topic: m.topic,
-            scenario: m.scenario,
-            schema_definition: m.schema_definition,
-            seed_data: m.seed_data,
-            expected_result: packExpectedResult({
-                expectedResult: m.expected_result,
-                missionOrder: m.mission_order,
-                hints: m.hints,
-                explanation: m.explanation,
-                starterQuery: m.starter_query,
-            }),
-            challenge_date: today,
-            points: 10,
-            is_active: true,
-        }));
-
-        const { error: insertErr } = await supabase
-            .from('query_quest_challenges')
-            .insert(rowsToInsert);
-
-        if (insertErr) throw insertErr;
-    })();
-
-    seedingLocks.set(today, seedPromise);
-    try {
-        await seedPromise;
-    } finally {
-        seedingLocks.delete(today);
-    }
-
-    const { data: seeded, error: fetchErr } = await supabase
+    const { data: seeded } = await supabase
         .from('query_quest_challenges')
         .select('*')
         .eq('challenge_date', today)
         .eq('is_active', true);
 
-    if (fetchErr) throw fetchErr;
-    return sortChallengesByOrder(seeded).slice(0, MAX_DAILY_MISSIONS);
+    return sortChallengesByOrder(seeded || []).slice(0, MAX_DAILY_MISSIONS);
 }
 
 function buildSampleData(seedData) {
@@ -117,11 +78,11 @@ function buildSampleData(seedData) {
     return samples;
 }
 
-function sanitizeChallengeForStudent(challenge, attempt) {
+function sanitizeChallengeForStudent(challenge, missionProgress) {
     const { missionOrder, hints, explanation, starterQuery } = unpackChallengeMeta(challenge);
-    const hintsUsed = attempt?.hints_used || 0;
-    const isCompleted = Boolean(attempt?.is_correct);
-    const pointsAwarded = attempt?.points_awarded || 0;
+    const hintsUsed = missionProgress?.hints_used || 0;
+    const isCompleted = Boolean(missionProgress?.is_correct);
+    const pointsAwarded = missionProgress?.points_awarded || 0;
 
     return {
         id: challenge.id,
@@ -133,7 +94,7 @@ function sanitizeChallengeForStudent(challenge, attempt) {
         description: challenge.description,
         schemaDefinition: challenge.schema_definition,
         sampleData: buildSampleData(challenge.seed_data),
-        starterQuery: attempt?.submitted_query || starterQuery,
+        starterQuery: missionProgress?.submitted_query || starterQuery,
         challengeDate: challenge.challenge_date,
         maxPoints: challenge.points || 10,
         totalHints: hints.length,
@@ -142,208 +103,119 @@ function sanitizeChallengeForStudent(challenge, attempt) {
         completed: isCompleted,
         isOptimal: isCompleted && pointsAwarded >= 10,
         pointsAwarded,
-        attemptsCount: attempt?.attempts_count || 0,
+        attemptsCount: missionProgress?.attempts_count || 0,
         ...(isCompleted ? { explanation } : {}),
     };
 }
 
-async function logExecution(usn, challengeId, status, durationMs, errorCategory = null) {
-    try {
-        await supabase.from('query_quest_execution_logs').insert({
-            usn,
-            challenge_id: challengeId,
-            execution_status: String(status || 'unknown').slice(0, 30),
-            execution_duration: Math.max(0, Math.round(durationMs || 0)),
-            error_category: errorCategory,
-        });
-    } catch (err) {
-        console.error('Failed to record execution log:', err.message);
-    }
-}
-
 /**
- * Records a Query Quest attempt atomically against query_quest_attempts (preventing duplicate
- * point awards per challenge) and syncs daily Query Quest points into game_attempts + user_statistics.
+ * Atomically updates a student's mission progress and daily score in game_scores.
  */
-async function recordAttemptAndSyncGame({
-    usn,
-    challenge,
-    submittedQuery,
-    isCorrect,
-    executionTime,
-    points,
-}) {
-    const { data: existingAttempt, error: fetchErr } = await supabase
-        .from('query_quest_attempts')
+async function recordMissionAttempt({ usn, challenge, submittedQuery, isCorrect, executionTime, points }) {
+    const today = challenge.challenge_date || getISTDate();
+
+    // 1. Fetch current game_score record for query_quest today
+    const { data: existing, error: fetchErr } = await supabase
+        .from('game_scores')
         .select('*')
         .eq('usn', usn)
-        .eq('challenge_id', challenge.id)
+        .eq('game_name', 'query_quest')
+        .eq('game_date', today)
         .maybeSingle();
 
     if (fetchErr) throw fetchErr;
 
-    let alreadyCompleted = false;
+    const details = existing?.details || {};
+    const missions = details.missions || {};
+    const chId = String(challenge.id);
+    const currentMission = missions[chId] || { attempts_count: 0, hints_used: 0 };
+
+    const attemptsCount = (currentMission.attempts_count || 0) + 1;
+    const alreadyCompleted = Boolean(currentMission.is_correct);
     let awardedNow = 0;
-    let attemptsCount = 1;
 
-    if (existingAttempt) {
-        attemptsCount = (existingAttempt.attempts_count || 0) + 1;
-        if (existingAttempt.is_correct) {
-            alreadyCompleted = true;
-            const { error: updErr } = await supabase
-                .from('query_quest_attempts')
-                .update({
-                    submitted_query: submittedQuery,
-                    execution_time: executionTime,
-                    attempts_count: attemptsCount,
-                })
-                .eq('id', existingAttempt.id);
-            if (updErr) throw updErr;
-        } else {
-            const earned = isCorrect ? points : 0;
-            awardedNow = earned;
-            const { error: updErr } = await supabase
-                .from('query_quest_attempts')
-                .update({
-                    submitted_query: submittedQuery,
-                    is_correct: isCorrect,
-                    execution_time: executionTime,
-                    attempts_count: attemptsCount,
-                    points_awarded: earned,
-                    ...(isCorrect ? { completed_at: new Date().toISOString() } : {}),
-                })
-                .eq('id', existingAttempt.id);
-            if (updErr) throw updErr;
-        }
-    } else {
-        const earned = isCorrect ? points : 0;
-        awardedNow = earned;
-        const { error: insErr } = await supabase
-            .from('query_quest_attempts')
-            .insert({
-                usn,
-                challenge_id: challenge.id,
-                submitted_query: submittedQuery,
-                is_correct: isCorrect,
-                execution_time: executionTime,
-                attempts_count: 1,
-                hints_used: 0,
-                points_awarded: earned,
-                ...(isCorrect ? { completed_at: new Date().toISOString() } : {}),
-            });
-        if (insErr) throw insErr;
+    if (!alreadyCompleted && isCorrect) {
+        awardedNow = points;
     }
 
-    // Recompute student's Query Quest score for challenge.challenge_date and sync game_attempts
-    const { data: dateChallenges, error: chListErr } = await supabase
-        .from('query_quest_challenges')
-        .select('id')
-        .eq('challenge_date', challenge.challenge_date)
-        .eq('is_active', true);
-
-    if (chListErr) throw chListErr;
-
-    const dateIds = (dateChallenges || []).map((c) => c.id);
-    let totalQqToday = 0;
-    let completedCount = 0;
-
-    if (dateIds.length > 0) {
-        const { data: dateAttempts, error: daErr } = await supabase
-            .from('query_quest_attempts')
-            .select('challenge_id, is_correct, points_awarded')
-            .eq('usn', usn)
-            .in('challenge_id', dateIds);
-
-        if (daErr) throw daErr;
-
-        totalQqToday = Math.min(
-            MAX_DAILY_POINTS,
-            (dateAttempts || []).reduce((sum, a) => sum + (Number(a.points_awarded) || 0), 0)
-        );
-        completedCount = (dateAttempts || []).filter((a) => a.is_correct).length;
-    }
-
-    const { data: existingGameAttempt, error: gaFetchErr } = await supabase
-        .from('game_attempts')
-        .select('id')
-        .eq('usn', usn)
-        .eq('game_key', 'query_quest')
-        .eq('game_date', challenge.challenge_date)
-        .maybeSingle();
-
-    if (gaFetchErr) throw gaFetchErr;
-
-    const gameMetadata = {
-        completed: completedCount > 0,
-        allCompleted: dateIds.length > 0 && completedCount >= dateIds.length,
-        completedCount,
-        totalMissions: dateIds.length || MAX_DAILY_MISSIONS,
+    const updatedMission = {
+        is_correct: alreadyCompleted || isCorrect,
+        is_optimal: alreadyCompleted ? currentMission.is_optimal : (isCorrect && points >= 10),
+        submitted_query: submittedQuery,
+        execution_time: executionTime,
+        attempts_count: attemptsCount,
+        hints_used: currentMission.hints_used || 0,
+        points_awarded: alreadyCompleted ? currentMission.points_awarded : awardedNow,
+        completed_at: isCorrect ? (currentMission.completed_at || new Date().toISOString()) : null,
     };
 
-    if (existingGameAttempt) {
-        const { error: gaUpdErr } = await supabase
-            .from('game_attempts')
+    missions[chId] = updatedMission;
+
+    // Sum daily points from all missions completed today
+    let totalScore = 0;
+    let completedCount = 0;
+    for (const m of Object.values(missions)) {
+        if (m.is_correct) {
+            completedCount += 1;
+            totalScore += Number(m.points_awarded) || 0;
+        }
+    }
+    totalScore = Math.min(MAX_DAILY_POINTS, totalScore);
+
+    const updatedDetails = {
+        completed: completedCount > 0,
+        missions,
+    };
+
+    if (existing) {
+        await supabase
+            .from('game_scores')
             .update({
-                score: totalQqToday,
+                score: totalScore,
                 completed_at: new Date().toISOString(),
-                metadata: gameMetadata,
+                details: updatedDetails,
             })
-            .eq('id', existingGameAttempt.id);
-        if (gaUpdErr) throw gaUpdErr;
-    } else if (totalQqToday > 0 || completedCount > 0) {
-        const { error: gaInsErr } = await supabase
-            .from('game_attempts')
+            .eq('id', existing.id);
+    } else {
+        await supabase
+            .from('game_scores')
             .insert({
                 usn,
-                game_key: 'query_quest',
-                game_date: challenge.challenge_date,
-                score: totalQqToday,
+                game_name: 'query_quest',
+                game_date: today,
+                score: totalScore,
                 completed_at: new Date().toISOString(),
-                metadata: gameMetadata,
+                details: updatedDetails,
             });
-        if (gaInsErr) throw gaInsErr;
     }
-
-    await syncUserStatistics(supabase, usn);
 
     return {
         awardedNow,
         alreadyCompleted,
-        totalQqToday,
+        totalQqToday: totalScore,
         attemptsCount,
     };
 }
 
 /**
  * GET /api/query-quest/today
- * Returns today's 6 daily missions (IST) without expected_result plus student progress.
  */
 exports.getTodayChallenges = async (req, res, next) => {
     try {
         const today = getISTDate();
         const challenges = await ensureTodayChallenges(today);
 
-        const challengeIds = challenges.map((c) => c.id);
-        let attempts = [];
-        if (challengeIds.length > 0) {
-            const { data: attData, error: attErr } = await supabase
-                .from('query_quest_attempts')
-                .select('*')
-                .eq('usn', req.user.usn)
-                .in('challenge_id', challengeIds);
+        const { data: scoreRow } = await supabase
+            .from('game_scores')
+            .select('details, score')
+            .eq('usn', req.user.usn)
+            .eq('game_name', 'query_quest')
+            .eq('game_date', today)
+            .maybeSingle();
 
-            if (attErr) throw attErr;
-            attempts = attData || [];
-        }
-
-        const attemptMap = new Map(attempts.map((a) => [a.challenge_id, a]));
-        const safeChallenges = challenges.map((ch) => sanitizeChallengeForStudent(ch, attemptMap.get(ch.id)));
-
+        const missionsMap = scoreRow?.details?.missions || {};
+        const safeChallenges = challenges.map((ch) => sanitizeChallengeForStudent(ch, missionsMap[String(ch.id)]));
         const completedCount = safeChallenges.filter((c) => c.completed).length;
-        const todayPoints = Math.min(
-            MAX_DAILY_POINTS,
-            safeChallenges.reduce((sum, c) => sum + (c.pointsAwarded || 0), 0)
-        );
 
         return res.json({
             date: today,
@@ -351,7 +223,7 @@ exports.getTodayChallenges = async (req, res, next) => {
             progress: {
                 completedCount,
                 totalMissions: safeChallenges.length,
-                todayPoints,
+                todayPoints: scoreRow?.score || 0,
                 maxPoints: MAX_DAILY_POINTS,
             },
         });
@@ -362,7 +234,6 @@ exports.getTodayChallenges = async (req, res, next) => {
 
 /**
  * GET /api/query-quest/challenges/:id
- * Returns a single mission's details, schema, sample rows, and student state.
  */
 exports.getChallengeById = async (req, res, next) => {
     try {
@@ -383,17 +254,18 @@ exports.getChallengeById = async (req, res, next) => {
             return res.status(404).json({ error: 'Challenge not found' });
         }
 
-        const { data: attempt, error: attErr } = await supabase
-            .from('query_quest_attempts')
-            .select('*')
+        const { data: scoreRow } = await supabase
+            .from('game_scores')
+            .select('details')
             .eq('usn', req.user.usn)
-            .eq('challenge_id', challengeId)
+            .eq('game_name', 'query_quest')
+            .eq('game_date', challenge.challenge_date)
             .maybeSingle();
 
-        if (attErr) throw attErr;
+        const missionProgress = scoreRow?.details?.missions?.[String(challengeId)];
 
         return res.json({
-            challenge: sanitizeChallengeForStudent(challenge, attempt),
+            challenge: sanitizeChallengeForStudent(challenge, missionProgress),
         });
     } catch (err) {
         next(err);
@@ -402,8 +274,6 @@ exports.getChallengeById = async (req, res, next) => {
 
 /**
  * POST /api/query-quest/execute
- * Validates, executes in isolated PostgreSQL sandbox, grades against expected_result,
- * scores optimality, and atomically records completion + leaderboard sync.
  */
 exports.executeQuery = async (req, res, next) => {
     try {
@@ -426,13 +296,11 @@ exports.executeQuery = async (req, res, next) => {
             return res.status(404).json({ error: 'Challenge not found or inactive' });
         }
 
-        // 1. Strict AST SQL validation (single read-only SELECT / WITH-SELECT)
         let validated;
         try {
             validated = validateStudentQuery(rawSql);
         } catch (valErr) {
             if (valErr instanceof ValidationError) {
-                await logExecution(req.user.usn, challengeId, valErr.category, 0, valErr.category);
                 return res.status(400).json({
                     success: false,
                     columns: [],
@@ -448,18 +316,9 @@ exports.executeQuery = async (req, res, next) => {
             throw valErr;
         }
 
-        // 2. Execute against isolated practice PostgreSQL instance / schema
         const execResult = await executeSandboxedQuery(validated.cleanSql, challengeId, challenge);
 
         if (!execResult.success) {
-            await logExecution(
-                req.user.usn,
-                challengeId,
-                execResult.errorCategory || 'runtime_error',
-                execResult.durationMs,
-                execResult.errorCategory
-            );
-
             return res.json({
                 success: false,
                 columns: [],
@@ -474,14 +333,10 @@ exports.executeQuery = async (req, res, next) => {
             });
         }
 
-        // 3. Evaluate actual result vs hidden expected_result
         const evaluation = evaluateQueryResult(execResult, challenge.expected_result);
-
-        // 4. Assess optimality (5 pts standard, 10 pts optimal, 0 pts incorrect)
         const scoring = scoreQuerySolution(evaluation.isCorrect, validated.features, challenge.expected_result);
 
-        // 5. Record attempt & sync daily score into game_attempts + user_statistics
-        const syncRow = await recordAttemptAndSyncGame({
+        const syncResult = await recordMissionAttempt({
             usn: req.user.usn,
             challenge,
             submittedQuery: validated.cleanSql,
@@ -489,14 +344,6 @@ exports.executeQuery = async (req, res, next) => {
             executionTime: execResult.durationMs,
             points: scoring.points,
         });
-
-        await logExecution(
-            req.user.usn,
-            challengeId,
-            evaluation.isCorrect ? 'success' : 'wrong_result',
-            execResult.durationMs,
-            evaluation.isCorrect ? null : 'wrong_result'
-        );
 
         const { explanation } = unpackChallengeMeta(challenge);
 
@@ -514,10 +361,10 @@ exports.executeQuery = async (req, res, next) => {
             mismatchDetail: evaluation.mismatchDetail,
             isOptimal: scoring.isOptimal,
             optimalityFeedback: scoring.optimalityFeedback,
-            pointsAwarded: syncRow.awardedNow,
-            alreadyCompleted: syncRow.alreadyCompleted,
-            totalQqToday: syncRow.totalQqToday,
-            attemptsCount: syncRow.attemptsCount,
+            pointsAwarded: syncResult.awardedNow,
+            alreadyCompleted: syncResult.alreadyCompleted,
+            totalQqToday: syncResult.totalQqToday,
+            attemptsCount: syncResult.attemptsCount,
             ...(evaluation.isCorrect ? { explanation } : {}),
         });
     } catch (err) {
@@ -527,7 +374,6 @@ exports.executeQuery = async (req, res, next) => {
 
 /**
  * POST /api/query-quest/hint
- * Reveals the next progressive hint for a mission and stores hints_used.
  */
 exports.requestHint = async (req, res, next) => {
     try {
@@ -536,59 +382,53 @@ exports.requestHint = async (req, res, next) => {
             return res.status(400).json({ error: 'Valid challengeId is required' });
         }
 
-        const { data: challenge, error: chErr } = await supabase
+        const { data: challenge } = await supabase
             .from('query_quest_challenges')
-            .select('id, expected_result')
+            .select('id, expected_result, challenge_date')
             .eq('id', challengeId)
-            .eq('is_active', true)
             .maybeSingle();
 
-        if (chErr) throw chErr;
         if (!challenge) {
             return res.status(404).json({ error: 'Challenge not found' });
         }
 
         const { hints } = unpackChallengeMeta(challenge);
-        if (hints.length === 0) {
-            return res.json({ hint: null, hintsUsed: 0, totalHints: 0, revealedHints: [] });
-        }
+        const today = challenge.challenge_date || getISTDate();
 
-        const { data: attempt, error: attErr } = await supabase
-            .from('query_quest_attempts')
+        const { data: scoreRow } = await supabase
+            .from('game_scores')
             .select('*')
             .eq('usn', req.user.usn)
-            .eq('challenge_id', challengeId)
+            .eq('game_name', 'query_quest')
+            .eq('game_date', today)
             .maybeSingle();
 
-        if (attErr) throw attErr;
+        const details = scoreRow?.details || {};
+        const missions = details.missions || {};
+        const chId = String(challengeId);
+        const currentMission = missions[chId] || { attempts_count: 0, hints_used: 0 };
 
-        const currentUsed = attempt?.hints_used || 0;
+        const currentUsed = currentMission.hints_used || 0;
         const nextUsed = Math.min(hints.length, currentUsed + 1);
 
-        if (attempt) {
-            if (nextUsed > currentUsed) {
-                const { error: updErr } = await supabase
-                    .from('query_quest_attempts')
-                    .update({ hints_used: nextUsed })
-                    .eq('id', attempt.id);
-                if (updErr) throw updErr;
-            }
+        currentMission.hints_used = nextUsed;
+        missions[chId] = currentMission;
+        details.missions = missions;
+
+        if (scoreRow) {
+            await supabase.from('game_scores').update({ details }).eq('id', scoreRow.id);
         } else {
-            const { error: insErr } = await supabase.from('query_quest_attempts').insert({
+            await supabase.from('game_scores').insert({
                 usn: req.user.usn,
-                challenge_id: challengeId,
-                submitted_query: '',
-                is_correct: false,
-                execution_time: 0,
-                attempts_count: 0,
-                hints_used: nextUsed,
-                points_awarded: 0,
+                game_name: 'query_quest',
+                game_date: today,
+                score: 0,
+                details,
             });
-            if (insErr) throw insErr;
         }
 
         return res.json({
-            hint: hints[nextUsed - 1],
+            hint: hints[nextUsed - 1] || null,
             hintsUsed: nextUsed,
             totalHints: hints.length,
             revealedHints: hints.slice(0, nextUsed),
@@ -600,42 +440,40 @@ exports.requestHint = async (req, res, next) => {
 
 /**
  * GET /api/query-quest/progress
- * Returns the authenticated student's Query Quest daily progress.
  */
 exports.getProgress = async (req, res, next) => {
     try {
         const today = getISTDate();
         const challenges = await ensureTodayChallenges(today);
-        const challengeIds = challenges.map((c) => c.id);
 
-        let attempts = [];
-        if (challengeIds.length > 0) {
-            const { data, error } = await supabase
-                .from('query_quest_attempts')
-                .select('challenge_id, is_correct, points_awarded, attempts_count, hints_used, execution_time, completed_at')
-                .eq('usn', req.user.usn)
-                .in('challenge_id', challengeIds);
+        const { data: scoreRow } = await supabase
+            .from('game_scores')
+            .select('*')
+            .eq('usn', req.user.usn)
+            .eq('game_name', 'query_quest')
+            .eq('game_date', today)
+            .maybeSingle();
 
-            if (error) throw error;
-            attempts = (data || []).map((a) => ({
-                ...a,
-                is_optimal: (a.points_awarded || 0) >= 10,
-            }));
-        }
+        const missions = scoreRow?.details?.missions || {};
+        const attemptsList = Object.entries(missions).map(([cId, m]) => ({
+            challenge_id: cId,
+            is_correct: m.is_correct,
+            points_awarded: m.points_awarded,
+            attempts_count: m.attempts_count,
+            hints_used: m.hints_used,
+            execution_time: m.execution_time,
+            is_optimal: m.is_optimal,
+        }));
 
-        const completedCount = attempts.filter((a) => a.is_correct).length;
-        const todayPoints = Math.min(
-            MAX_DAILY_POINTS,
-            attempts.reduce((sum, a) => sum + (a.points_awarded || 0), 0)
-        );
+        const completedCount = attemptsList.filter((a) => a.is_correct).length;
 
         return res.json({
             date: today,
             completedCount,
             totalMissions: challenges.length,
-            todayPoints,
+            todayPoints: scoreRow?.score || 0,
             maxPoints: MAX_DAILY_POINTS,
-            attempts,
+            attempts: attemptsList,
         });
     } catch (err) {
         next(err);
@@ -644,39 +482,54 @@ exports.getProgress = async (req, res, next) => {
 
 /**
  * GET /api/query-quest/leaderboard
- * Returns Query Quest rankings and SQL performance stats from query_quest_attempts.
  */
 exports.getLeaderboard = async (req, res, next) => {
     try {
         const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
 
-        const { data: attempts, error: attErr } = await supabase
-            .from('query_quest_attempts')
-            .select('usn, points_awarded, execution_time, is_correct, users(role, departments(department_name))')
-            .eq('is_correct', true);
+        const { data: scores, error } = await supabase
+            .from('game_scores')
+            .select('usn, score, details, users(department, role)')
+            .eq('game_name', 'query_quest');
 
-        if (attErr) throw attErr;
+        if (error) throw error;
 
         const map = new Map();
-        for (const row of attempts || []) {
+        for (const row of scores || []) {
             if (row.users?.role === 'admin') continue;
-            const pts = row.points_awarded || 0;
+            const missions = row.details?.missions || {};
+
+            let optimalSolves = 0;
+            let missionsCompleted = 0;
+            let totalExecMs = 0;
+
+            for (const m of Object.values(missions)) {
+                if (m.is_correct) {
+                    missionsCompleted += 1;
+                    if (m.is_optimal) optimalSolves += 1;
+                    totalExecMs += Number(m.execution_time) || 0;
+                }
+            }
+
             const cur = map.get(row.usn) || {
                 usn: row.usn,
-                department: row.users?.departments?.department_name || '',
+                department: row.users?.department || '',
                 totalPoints: 0,
                 missionsCompleted: 0,
                 optimalSolves: 0,
                 totalExecMs: 0,
             };
-            cur.totalPoints += pts;
-            cur.missionsCompleted += 1;
-            if (pts >= 10) cur.optimalSolves += 1;
-            cur.totalExecMs += row.execution_time || 0;
+
+            cur.totalPoints += Number(row.score) || 0;
+            cur.missionsCompleted += missionsCompleted;
+            cur.optimalSolves += optimalSolves;
+            cur.totalExecMs += totalExecMs;
+
             map.set(row.usn, cur);
         }
 
         const sorted = Array.from(map.values())
+            .filter((entry) => entry.totalPoints > 0)
             .sort((a, b) => b.totalPoints - a.totalPoints || b.optimalSolves - a.optimalSolves)
             .slice(0, limit)
             .map((entry, idx) => ({

@@ -21,7 +21,7 @@ function formatAdminContent(gameKey, storedQuestions) {
 
 /**
  * POST /api/admin/games/:gameType
- * Creates or updates daily_questions content for the given game_key and date.
+ * Saves daily_questions in the simplified schema (game_name, game_date, questions).
  */
 exports.setDailyGame = async (req, res, next) => {
     try {
@@ -54,20 +54,6 @@ exports.setDailyGame = async (req, res, next) => {
             if (!Array.isArray(questions) || questions.length !== 5) {
                 return res.status(400).json({ error: 'Exactly 5 questions are required' });
             }
-            const valid = questions.every(
-                (item) =>
-                    item &&
-                    typeof item.q === 'string' &&
-                    item.q.trim() &&
-                    typeof item.answer === 'string' &&
-                    item.answer.trim() &&
-                    Array.isArray(item.options) &&
-                    item.options.length === 4 &&
-                    item.options.every((opt) => typeof opt === 'string' && opt.trim())
-            );
-            if (!valid) {
-                return res.status(400).json({ error: 'All question fields and 4 options must be filled' });
-            }
             questionsPayload = questions.map((item) => ({
                 q: item.q.trim(),
                 options: item.options.map((o) => o.trim()),
@@ -76,36 +62,28 @@ exports.setDailyGame = async (req, res, next) => {
             }));
         }
 
-        const { data: existing, error: fetchErr } = await supabase
+        const { data: existing } = await supabase
             .from('daily_questions')
             .select('id')
-            .eq('game_key', gameKey)
             .eq('game_date', targetDate)
             .maybeSingle();
 
-        if (fetchErr) throw fetchErr;
-
         if (existing) {
-            const { error: updErr } = await supabase
+            await supabase
                 .from('daily_questions')
                 .update({
+                    game_name: gameKey,
                     questions: questionsPayload,
-                    updated_at: new Date().toISOString(),
                 })
                 .eq('id', existing.id);
-
-            if (updErr) throw updErr;
         } else {
-            const { error: insErr } = await supabase
+            await supabase
                 .from('daily_questions')
                 .insert({
-                    game_key: gameKey,
+                    game_name: gameKey,
                     game_date: targetDate,
                     questions: questionsPayload,
-                    updated_at: new Date().toISOString(),
                 });
-
-            if (insErr) throw insErr;
         }
 
         return res.json({
@@ -121,7 +99,6 @@ exports.setDailyGame = async (req, res, next) => {
 
 /**
  * GET /api/admin/games/:gameType
- * Retrieves configured daily_questions content for a date (defaults to today).
  */
 exports.getDailyGame = async (req, res, next) => {
     try {
@@ -131,14 +108,11 @@ exports.getDailyGame = async (req, res, next) => {
         }
 
         const targetDate = req.query.date || getTodayDate();
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('daily_questions')
             .select('questions')
-            .eq('game_key', gameKey)
             .eq('game_date', targetDate)
             .maybeSingle();
-
-        if (error) throw error;
 
         const stored = data?.questions || null;
         const fallback = getDefaultContentForKey(gameKey);

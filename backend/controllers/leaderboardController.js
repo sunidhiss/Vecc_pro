@@ -1,29 +1,29 @@
 const supabase = require('../config/supabase');
-const { isAttemptCompleted } = require('../utils/gameKeys');
+const { isScoreCompleted } = require('../utils/gameKeys');
 
 /**
  * GET /api/leaderboard/students
- * Returns top students ordered by total accumulated points from game_attempts.
+ * Straightforward student leaderboard querying users and game_scores.
  */
 exports.getStudents = async (req, res, next) => {
     try {
         const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
 
-        const { data: users, error: usersErr } = await supabase
+        const { data: users, error } = await supabase
             .from('users')
-            .select('usn, role, departments(department_name), game_attempts(score, metadata)')
+            .select('usn, department, game_scores(score, details)')
             .neq('role', 'admin');
 
-        if (usersErr) throw usersErr;
+        if (error) throw error;
 
         const list = (users || [])
             .map((u) => {
-                const totalPoints = (u.game_attempts || [])
-                    .filter(isAttemptCompleted)
+                const totalPoints = (u.game_scores || [])
+                    .filter(isScoreCompleted)
                     .reduce((acc, row) => acc + (Number(row.score) || 0), 0);
                 return {
                     usn: u.usn,
-                    department: u.departments?.department_name || '',
+                    department: u.department || '',
                     totalPoints,
                 };
             })
@@ -40,30 +40,36 @@ exports.getStudents = async (req, res, next) => {
 
 /**
  * GET /api/leaderboard/departments
- * Returns department standings calculated from game_attempts.
+ * Clean department standings aggregating points directly from users and game_scores.
  */
 exports.getDepartments = async (req, res, next) => {
     try {
-        const { data: depts, error: deptErr } = await supabase
-            .from('departments')
-            .select('department_code, department_name, users(usn, role, game_attempts(score, metadata))');
+        const { data: users, error } = await supabase
+            .from('users')
+            .select('department, role, game_scores(score, details)')
+            .neq('role', 'admin');
 
-        if (deptErr) throw deptErr;
+        if (error) throw error;
 
-        const list = (depts || [])
-            .map((d) => {
-                let totalPoints = 0;
-                let activePlayers = 0;
-                for (const u of d.users || []) {
-                    if (u.role === 'admin') continue;
-                    const userPts = (u.game_attempts || [])
-                        .filter(isAttemptCompleted)
-                        .reduce((acc, row) => acc + (Number(row.score) || 0), 0);
-                    totalPoints += userPts;
-                    if (userPts > 0) activePlayers += 1;
-                }
-                return { name: d.department_name, totalPoints, activePlayers };
-            })
+        const deptMap = new Map();
+
+        for (const u of users || []) {
+            const dept = u.department || 'General Engineering';
+            if (!deptMap.has(dept)) {
+                deptMap.set(dept, { name: dept, totalPoints: 0, activePlayers: 0 });
+            }
+            const record = deptMap.get(dept);
+            const userPts = (u.game_scores || [])
+                .filter(isScoreCompleted)
+                .reduce((acc, row) => acc + (Number(row.score) || 0), 0);
+
+            record.totalPoints += userPts;
+            if (userPts > 0) {
+                record.activePlayers += 1;
+            }
+        }
+
+        const list = Array.from(deptMap.values())
             .sort((a, b) => b.totalPoints - a.totalPoints);
 
         return res.json(list);

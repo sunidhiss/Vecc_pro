@@ -25,9 +25,7 @@ function parseUSN(usnString) {
     const year = trimmed.substring(3, 5);
     const deptCode = trimmed.substring(5, 7).toUpperCase();
     const rollNo = trimmed.substring(7);
-    const department = DEPT_MAP[deptCode];
-
-    if (!department) return null;
+    const department = DEPT_MAP[deptCode] || 'General Engineering';
 
     return {
         usn: trimmed.toUpperCase(),
@@ -55,13 +53,11 @@ function signToken(user) {
     );
 }
 
-function formatUser(user, fallbackDepartment) {
+function formatUser(user) {
     const isAdmin = isAdminUser(user);
     return {
         usn: user.usn,
-        department: isAdmin
-            ? 'System Admin'
-            : (DEPT_MAP[user.department_code] || fallbackDepartment || user.department_code),
+        department: isAdmin ? 'System Admin' : (user.department || DEPT_MAP[user.department_code] || 'General Engineering'),
         year: user.academic_year ?? user.year ?? null,
         rollNo: user.roll_no ?? null,
         role: user.role || (isAdmin ? 'admin' : 'student'),
@@ -78,7 +74,7 @@ function timingSafeMatch(input, expected) {
 
 /**
  * POST /api/auth/login
- * Validates USN format, creates user if new, and returns JWT.
+ * Validates USN format, creates user in users table if new, and returns JWT.
  */
 exports.login = async (req, res, next) => {
     try {
@@ -101,6 +97,7 @@ exports.login = async (req, res, next) => {
                 .from('users')
                 .insert({
                     usn: parsed.usn,
+                    department: parsed.department,
                     department_code: parsed.departmentCode,
                     academic_year: parsed.year,
                     roll_no: parsed.rollNo,
@@ -115,7 +112,7 @@ exports.login = async (req, res, next) => {
 
         const token = signToken(user);
         return res.json({
-            user: formatUser(user, parsed.department),
+            user: formatUser(user),
             token,
         });
     } catch (err) {
@@ -125,7 +122,7 @@ exports.login = async (req, res, next) => {
 
 /**
  * POST /api/auth/admin-login
- * Authenticates admin account using bcrypt password verification (with env fallback if password_hash column is absent).
+ * Authenticates admin account using bcrypt password verification.
  */
 exports.adminLogin = async (req, res, next) => {
     try {
@@ -147,30 +144,19 @@ exports.adminLogin = async (req, res, next) => {
 
         if (!admin) {
             const passwordHash = await bcrypt.hash(initialPassword, 10);
-            const baseAdminRow = {
-                usn: 'ADMIN',
-                department_code: 'CS',
-                academic_year: '00',
-                roll_no: '000',
-                role: 'admin',
-            };
-
-            let { data: created, error: insertError } = await supabase
+            const { data: created, error: insertError } = await supabase
                 .from('users')
-                .insert({ ...baseAdminRow, password_hash: passwordHash })
+                .insert({
+                    usn: 'ADMIN',
+                    department: 'System Administration',
+                    department_code: 'CS',
+                    academic_year: '00',
+                    roll_no: '000',
+                    role: 'admin',
+                    password_hash: passwordHash,
+                })
                 .select('*')
                 .single();
-
-            // Allow admin login before migration.sql adds password_hash column
-            if (insertError && (insertError.code === 'PGRST204' || insertError.code === '42703' || String(insertError.message || '').includes('password_hash'))) {
-                const retry = await supabase
-                    .from('users')
-                    .insert(baseAdminRow)
-                    .select('*')
-                    .single();
-                created = retry.data;
-                insertError = retry.error;
-            }
 
             if (insertError) throw insertError;
             admin = created;
