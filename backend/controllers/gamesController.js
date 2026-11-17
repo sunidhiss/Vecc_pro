@@ -21,22 +21,24 @@ function getISTDate() {
     }).format(new Date());
 }
 
-async function getDailyGameQuestions(rawGameType, date = getTodayDate()) {
+async function getDailyGameRecord(rawGameType, date = getTodayDate()) {
     const gameKey = normalizeGameKey(rawGameType);
-    if (!gameKey) return getDefaultContentForKey('wordle');
+    if (!gameKey) {
+        return { id: null, content: getDefaultContentForKey('wordle') };
+    }
 
-    // Query daily_questions table (checks game_name or fallback game_key during transition)
     const { data, error } = await supabase
         .from('daily_questions')
-        .select('*')
+        .select('id, questions')
+        .eq('game_name', gameKey)
         .eq('game_date', date)
         .maybeSingle();
 
-    if (error || !data || (!data.questions && !data.word)) {
-        return getDefaultContentForKey(gameKey);
+    if (error || !data || !data.questions) {
+        return { id: null, content: getDefaultContentForKey(gameKey) };
     }
 
-    return data.questions || data;
+    return { id: data.id, content: data.questions };
 }
 
 function evaluateGuess(guess, targetWord) {
@@ -196,7 +198,7 @@ exports.submitWordleGuess = async (req, res, next) => {
             return res.status(400).json({ error: 'You already played Wordle today!' });
         }
 
-        const content = await getDailyGameQuestions('wordle', today);
+        const { id: dailyQuestionId, content } = await getDailyGameRecord('wordle', today);
         const targetWord = (content.word || 'FLAME').toUpperCase();
         const result = evaluateGuess(rawGuess, targetWord);
 
@@ -223,6 +225,7 @@ exports.submitWordleGuess = async (req, res, next) => {
                 .update({
                     score,
                     details,
+                    daily_question_id: dailyQuestionId || existing.daily_question_id || null,
                     ...(gameOver ? { completed_at: new Date().toISOString() } : {}),
                 })
                 .eq('id', existing.id);
@@ -237,6 +240,7 @@ exports.submitWordleGuess = async (req, res, next) => {
                     game_name: 'wordle',
                     score,
                     details,
+                    daily_question_id: dailyQuestionId || null,
                 });
 
             if (insertErr) {
@@ -284,7 +288,7 @@ exports.getQuiz = async (req, res, next) => {
             return res.json({ alreadyPlayed: true });
         }
 
-        const content = await getDailyGameQuestions(gameKey, today);
+        const { content } = await getDailyGameRecord(gameKey, today);
         const safeQuestions = (content.questions || []).map(({ q, options, code }) => ({
             q,
             options,
@@ -330,7 +334,7 @@ exports.submitQuiz = async (req, res, next) => {
             return res.status(400).json({ error: 'You already played this quiz today!' });
         }
 
-        const content = await getDailyGameQuestions(gameKey, today);
+        const { id: dailyQuestionId, content } = await getDailyGameRecord(gameKey, today);
         const questions = content.questions || [];
         let score = 0;
         const correctAnswers = questions.map((q, idx) => {
@@ -348,6 +352,7 @@ exports.submitQuiz = async (req, res, next) => {
                 game_name: gameKey,
                 score,
                 completed_at: new Date().toISOString(),
+                daily_question_id: dailyQuestionId || null,
                 details: {
                     completed: true,
                     answers,
@@ -397,7 +402,7 @@ exports.getUnscramble = async (req, res, next) => {
             });
         }
 
-        const content = await getDailyGameQuestions('unscramble', today);
+        const { content } = await getDailyGameRecord('unscramble', today);
         const targetWord = (content.word || 'REACT').toUpperCase();
 
         return res.json({
@@ -435,7 +440,7 @@ exports.submitUnscramble = async (req, res, next) => {
             return res.status(400).json({ error: 'You already played Unscramble today!' });
         }
 
-        const content = await getDailyGameQuestions('unscramble', today);
+        const { id: dailyQuestionId, content } = await getDailyGameRecord('unscramble', today);
         const targetWord = (content.word || 'REACT').toUpperCase();
         const correct = rawGuess === targetWord;
         const score = correct ? 50 : 0;
@@ -448,6 +453,7 @@ exports.submitUnscramble = async (req, res, next) => {
                 game_name: 'unscramble',
                 score,
                 completed_at: new Date().toISOString(),
+                daily_question_id: dailyQuestionId || null,
                 details: {
                     completed: true,
                     win: correct,

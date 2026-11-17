@@ -172,6 +172,7 @@ async function recordMissionAttempt({ usn, challenge, submittedQuery, isCorrect,
             .from('game_scores')
             .update({
                 score: totalScore,
+                challenge_id: challenge.id,
                 completed_at: new Date().toISOString(),
                 details: updatedDetails,
             })
@@ -184,6 +185,7 @@ async function recordMissionAttempt({ usn, challenge, submittedQuery, isCorrect,
                 game_name: 'query_quest',
                 game_date: today,
                 score: totalScore,
+                challenge_id: challenge.id,
                 completed_at: new Date().toISOString(),
                 details: updatedDetails,
             });

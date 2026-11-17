@@ -53,18 +53,26 @@ function CustomEntityNode({ data, selected }) {
             onKeyDown={handleKeyDown}
         >
             {/* Unambiguous source/target handles for non-overlapping orthogonal ERD connectors */}
+            <Handle id="top" type="target" position={Position.Top} style={HANDLE_STYLE} />
+            <Handle id="bottom" type="source" position={Position.Bottom} style={HANDLE_STYLE} />
+            <Handle id="left" type="target" position={Position.Left} style={HANDLE_STYLE} />
+            <Handle id="right" type="source" position={Position.Right} style={HANDLE_STYLE} />
+
             <Handle id="tgt-top" type="target" position={Position.Top} style={HANDLE_STYLE} />
             <Handle id="src-top" type="source" position={Position.Top} style={HANDLE_STYLE} />
             <Handle id="src-top-left" type="source" position={Position.Top} style={{ ...HANDLE_STYLE, left: '24%' }} />
             <Handle id="src-top-right" type="source" position={Position.Top} style={{ ...HANDLE_STYLE, left: '76%' }} />
             <Handle id="tgt-left" type="target" position={Position.Left} style={HANDLE_STYLE} />
+            <Handle id="src-left" type="source" position={Position.Left} style={HANDLE_STYLE} />
+            <Handle id="tgt-right" type="target" position={Position.Right} style={HANDLE_STYLE} />
             <Handle id="src-right" type="source" position={Position.Right} style={HANDLE_STYLE} />
             <Handle id="tgt-bottom" type="target" position={Position.Bottom} style={HANDLE_STYLE} />
+            <Handle id="src-bottom" type="source" position={Position.Bottom} style={HANDLE_STYLE} />
             <Handle id="src-bottom-left" type="source" position={Position.Bottom} style={{ ...HANDLE_STYLE, left: '24%' }} />
             <Handle id="src-bottom-right" type="source" position={Position.Bottom} style={{ ...HANDLE_STYLE, left: '76%' }} />
 
             <div className="erd-entity-compact-body">
-                <span className="erd-entity-icon" aria-hidden="true">{entity.icon}</span>
+                {entity.icon && <span className="erd-entity-icon" aria-hidden="true">{entity.icon}</span>}
                 <span className="erd-entity-name">{entity.displayName}</span>
             </div>
         </div>

@@ -34,7 +34,16 @@ function getDirectionalCardinalityText(rel, currentEntityId) {
     return 'Many-to-One';
 }
 
-function computePopupPosition(rect, popupWidth = 355, popupHeight = 365) {
+function getEstimatedPopupHeight(entity) {
+    if (!entity) return 360;
+    const colCount = entity.columns?.length || 3;
+    const relCount = SCHEMA_RELATIONSHIPS.filter(
+        (r) => r.source === entity.id || r.target === entity.id
+    ).length;
+    return Math.min(520, 180 + colCount * 28 + relCount * 46);
+}
+
+function computePopupPosition(rect, popupWidth = 360, popupHeight = 440) {
     const pad = 16;
     const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
     const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
@@ -203,8 +212,8 @@ function DatabaseSchemaCanvas() {
         if (domEl) {
             const rect = domEl.getBoundingClientRect();
             const entity = entityMap[entityId];
-            const estHeight = Math.min(430, 155 + (entity?.columns.length || 4) * 26);
-            setPopupState({ entityId, ...computePopupPosition(rect, 355, estHeight) });
+            const estHeight = getEstimatedPopupHeight(entity);
+            setPopupState({ entityId, ...computePopupPosition(rect, 360, estHeight) });
         }
     }, [entityMap]);
 
@@ -222,8 +231,8 @@ function DatabaseSchemaCanvas() {
             if (domEl) {
                 const rect = domEl.getBoundingClientRect();
                 const entity = entityMap[entityId];
-                const estHeight = Math.min(430, 155 + (entity?.columns.length || 4) * 26);
-                setPopupState({ entityId, ...computePopupPosition(rect, 355, estHeight) });
+                const estHeight = getEstimatedPopupHeight(entity);
+                setPopupState({ entityId, ...computePopupPosition(rect, 360, estHeight) });
             }
         },
         [cancelHoverClear, entityMap]
@@ -499,15 +508,6 @@ function DatabaseSchemaCanvas() {
         );
     }, [popupEntity]);
 
-    const enforcedCount = useMemo(
-        () => SCHEMA_RELATIONSHIPS.filter((r) => r.enforced).length,
-        []
-    );
-    const conceptualCount = useMemo(
-        () => SCHEMA_RELATIONSHIPS.filter((r) => !r.enforced).length,
-        []
-    );
-
     return (
         <div className={`erd-page-shell ${isDark ? 'erd-dark' : ''}`}>
             <header className="erd-page-header">
@@ -585,8 +585,7 @@ function DatabaseSchemaCanvas() {
 
             <SchemaLegend
                 entityCount={SCHEMA_ENTITIES.length}
-                enforcedCount={enforcedCount}
-                conceptualCount={conceptualCount}
+                relationshipCount={SCHEMA_RELATIONSHIPS.length}
             />
 
             <footer className="erd-page-footer">
@@ -613,8 +612,11 @@ function DatabaseSchemaCanvas() {
                     <div className="erd-popup-header">
                         <div className="erd-popup-title-row">
                             <div className="erd-popup-title">
-                                <span>{popupEntity.icon}</span>
+                                {popupEntity.icon && <span>{popupEntity.icon}</span>}
                                 <span>{popupEntity.displayName}</span>
+                                <span className="erd-popup-category-badge">
+                                    {popupEntity.category === 'sql' ? 'SQL' : 'CORE'}
+                                </span>
                             </div>
                             {isPopupPinned && (
                                 <div className="erd-popup-pin-actions">
@@ -634,6 +636,9 @@ function DatabaseSchemaCanvas() {
                                 </div>
                             )}
                         </div>
+                        {popupEntity.description && (
+                            <p className="erd-popup-desc">{popupEntity.description}</p>
+                        )}
                     </div>
 
                     <div className="erd-popup-section-label">
@@ -645,14 +650,9 @@ function DatabaseSchemaCanvas() {
                                 <span className="erd-popup-attr-badges">
                                     {col.primaryKey && <span className="erd-key-badge erd-badge-pk">PK</span>}
                                     {col.foreignKey && <span className="erd-key-badge erd-badge-fk">FK</span>}
-                                    {col.unique && !col.primaryKey && <span className="erd-key-badge erd-badge-uq">UQ</span>}
-                                    {col.nullable === false && !col.primaryKey && (
-                                        <span className="erd-key-badge erd-badge-nn">NN</span>
-                                    )}
                                 </span>
-                                <span className="erd-popup-attr-name" title={col.description || col.name}>
+                                <span className="erd-popup-attr-name" title={col.name}>
                                     {col.name}
-                                    {col.restricted ? ' 🔒' : ''}
                                 </span>
                                 <span className="erd-popup-attr-type">{col.type}</span>
                             </div>
@@ -675,11 +675,16 @@ function DatabaseSchemaCanvas() {
                                     onClick={() => handleSelectAndPinEntity(peerId)}
                                     title={`Jump to ${peer?.displayName || peerId}`}
                                 >
-                                    <span className="erd-popup-rel-peer">
-                                        {peer?.displayName || peerId} — {dirText}
-                                    </span>
-                                    <span className={`erd-rel-kind ${rel.enforced ? 'is-enforced' : 'is-conceptual'}`}>
-                                        {rel.enforced ? 'FK' : 'APP'}
+                                    <div className="erd-popup-rel-info">
+                                        <span className="erd-popup-rel-peer">
+                                            {peer?.displayName || peerId}
+                                        </span>
+                                        <span className="erd-popup-rel-desc">
+                                            {rel.label} • {dirText}
+                                        </span>
+                                    </div>
+                                    <span className="erd-rel-kind is-cardinality">
+                                        {rel.cardinality || '1:N'}
                                     </span>
                                 </button>
                             );
@@ -700,13 +705,8 @@ function DatabaseSchemaCanvas() {
                             {entityMap[hoveredEdgeState.relationship.source]?.displayName} →{' '}
                             {entityMap[hoveredEdgeState.relationship.target]?.displayName}
                         </span>
-                        <span
-                            className={`erd-rel-kind ${
-                                hoveredEdgeState.relationship.enforced ? 'is-enforced' : 'is-conceptual'
-                            }`}
-                        >
-                            {hoveredEdgeState.relationship.cardinalityLabel} •{' '}
-                            {hoveredEdgeState.relationship.enforced ? 'ENFORCED FK' : 'CONCEPTUAL'}
+                        <span className="erd-rel-kind is-cardinality">
+                            {hoveredEdgeState.relationship.cardinalityLabel}
                         </span>
                     </div>
                     <div className="erd-rel-tooltip-fk">

@@ -31,7 +31,7 @@ const SchemaToolbar = ({
                         className={`erd-filter-btn cursor-target ${activeGroup === grp.id ? 'active' : ''}`}
                         onClick={() => onChangeGroup(grp.id)}
                     >
-                        {grp.icon} {grp.label.split(' ')[0]}
+                        {grp.label.split(' ')[0]}
                     </button>
                 ))}
             </div>

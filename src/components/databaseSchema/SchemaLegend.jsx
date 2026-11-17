@@ -1,7 +1,7 @@
 import React from 'react';
 import { ERD_LEGEND_ITEMS } from '../../data/databaseSchema';
 
-const SchemaLegend = ({ entityCount, enforcedCount, conceptualCount }) => {
+const SchemaLegend = ({ entityCount, relationshipCount = 4 }) => {
     return (
         <div className="erd-legend-bar pixel-border">
             <div className="erd-legend-items">
@@ -15,8 +15,7 @@ const SchemaLegend = ({ entityCount, enforcedCount, conceptualCount }) => {
 
             <div className="erd-legend-counts">
                 <span className="erd-count-pill">{entityCount} ENTITIES</span>
-                <span className="erd-count-pill">{enforcedCount} ENFORCED FKs</span>
-                <span className="erd-count-pill">{conceptualCount} CONCEPTUAL</span>
+                <span className="erd-count-pill">{relationshipCount} RELATIONSHIPS</span>
             </div>
         </div>
     );

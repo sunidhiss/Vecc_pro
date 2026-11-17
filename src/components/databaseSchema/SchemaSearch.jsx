@@ -11,21 +11,22 @@ const SchemaSearch = ({ entities, onSelectEntity }) => {
 
         const matches = [];
         for (const entity of entities) {
+            const tableName = entity.name || entity.table || entity.displayName || '';
             const tableMatch =
-                entity.table.toLowerCase().includes(q) ||
-                entity.displayName.toLowerCase().includes(q);
+                tableName.toLowerCase().includes(q) ||
+                (entity.displayName && entity.displayName.toLowerCase().includes(q));
 
             if (tableMatch) {
                 matches.push({
                     key: `table-${entity.id}`,
                     entityId: entity.id,
                     kind: 'ENTITY',
-                    title: entity.displayName,
-                    subtitle: `${entity.columns.length} columns • ${entity.code}`,
+                    title: entity.displayName || tableName,
+                    subtitle: `${entity.columns?.length || 0} attributes`,
                 });
             }
 
-            for (const col of entity.columns) {
+            for (const col of entity.columns || []) {
                 if (
                     col.name.toLowerCase().includes(q) ||
                     col.type.toLowerCase().includes(q)
@@ -34,7 +35,7 @@ const SchemaSearch = ({ entities, onSelectEntity }) => {
                         key: `col-${entity.id}-${col.name}`,
                         entityId: entity.id,
                         kind: 'ATTR',
-                        title: `${entity.table}.${col.name}`,
+                        title: `${tableName}.${col.name}`,
                         subtitle: `${col.type}${col.primaryKey ? ' • PK' : ''}${col.foreignKey ? ' • FK' : ''}`,
                     });
                 }
@@ -70,7 +71,6 @@ const SchemaSearch = ({ entities, onSelectEntity }) => {
     return (
         <div className="erd-search-wrap" ref={wrapRef}>
             <div className="erd-search-input-box">
-                <span className="erd-search-icon" aria-hidden="true">🔍</span>
                 <input
                     type="search"
                     className="pixel-input erd-search-input cursor-target"

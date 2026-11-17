@@ -168,6 +168,7 @@ function CustomRelationshipEdge({
                         transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
                         opacity,
                         pointerEvents: 'all',
+                        zIndex: isHighlighted ? 1000 : 100,
                     }}
                     onMouseEnter={(e) => onEdgeHover?.(relationship, { x: e.clientX, y: e.clientY })}
                     onMouseLeave={() => onEdgeLeave?.()}
@@ -176,8 +177,7 @@ function CustomRelationshipEdge({
                         onEdgeHover?.(relationship, { x: e.clientX, y: e.clientY });
                     }}
                 >
-                    {relationship?.cardinality || '1:N'}
-                    {isConceptual ? ' • APP' : ''}
+                    {relationship?.pillLabel || relationship?.label || relationship?.cardinality || '1:N'}
                 </div>
             </EdgeLabelRenderer>
         </g>
